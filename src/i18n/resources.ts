@@ -15,6 +15,7 @@ export const resources = {
         },
         actions: {
           signOut: 'Sign out',
+          search: 'Search',
           add: 'Add',
           create: 'Create',
           update: 'Update',
@@ -318,6 +319,7 @@ export const resources = {
           searchPlaceholder: 'Search by booking code, customer, phone, or plate number',
           statusAll: 'All statuses',
           paymentAll: 'All payment states',
+          more: 'More filters',
           reset: 'Reset filters',
           results: '{{count}} booking(s) shown',
           scope: {
@@ -551,6 +553,11 @@ export const resources = {
         calendar: {
           empty: 'No bookings match the current calendar view.',
           more: '+{{count}} more',
+          mobileTitle: 'Calendar overview',
+          mobileDescription: 'Tap a date to see the booking agenda for that day.',
+          selectedDate: 'Bookings on {{date}}',
+          selectedDateHint: '{{count}} booking(s)',
+          selectedDateEmpty: 'No bookings on the selected date.',
         },
         detailPage: {
           title: 'Booking {{bookingCode}}',
@@ -814,6 +821,7 @@ export const resources = {
         },
         actions: {
           signOut: 'Đăng xuất',
+          search: 'Tìm kiếm',
           add: 'Thêm',
           create: 'Tạo',
           update: 'Cập nhật',
@@ -1117,6 +1125,7 @@ export const resources = {
           searchPlaceholder: 'Tìm theo mã booking, khách hàng, số điện thoại hoặc biển số',
           statusAll: 'Tất cả trạng thái',
           paymentAll: 'Tất cả trạng thái thanh toán',
+          more: 'Thêm bộ lọc',
           reset: 'Xóa bộ lọc',
           results: 'Hiển thị {{count}} booking',
           scope: {
@@ -1350,6 +1359,11 @@ export const resources = {
         calendar: {
           empty: 'Không có booking nào phù hợp với chế độ lịch hiện tại.',
           more: '+{{count}} booking khác',
+          mobileTitle: 'Tổng quan lịch',
+          mobileDescription: 'Chạm vào một ngày để xem các booking trong ngày đó.',
+          selectedDate: 'Booking ngày {{date}}',
+          selectedDateHint: '{{count}} booking',
+          selectedDateEmpty: 'Không có booking nào trong ngày đã chọn.',
         },
         detailPage: {
           title: 'Booking {{bookingCode}}',

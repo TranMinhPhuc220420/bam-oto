@@ -9,9 +9,11 @@ export function LanguageSwitcher() {
   return (
     <Select
       aria-label={t('common.languages.label')}
-      className="min-w-[132px]"
+      className="min-w-[108px] sm:min-w-[132px]"
       value={value}
+      size="middle"
       variant="outlined"
+      popupMatchSelectWidth={false}
       suffixIcon={<GlobalOutlined />}
       onChange={(nextLanguage) => {
         void i18n.changeLanguage(nextLanguage)

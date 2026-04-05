@@ -9,7 +9,7 @@ import {
   PhoneOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Button, Descriptions, Drawer, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Drawer, Grid, Space, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 
@@ -83,6 +83,9 @@ function BreakdownSection({
   emptyText: string
   labels: { label: string; type: string; amount: string }
 }) {
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
+
   if (!items.length) {
     return (
       <div className="space-y-2">
@@ -101,37 +104,64 @@ function BreakdownSection({
       <Typography.Title level={5} className="!mb-0 text-slate-900">
         {title}
       </Typography.Title>
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-          <span>{labels.label}</span>
-          <span>{labels.type}</span>
-          <span className="text-right">{labels.amount}</span>
-        </div>
 
-        {items.map((item) => (
-          <div
-            key={item.key}
-            className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 border-t border-slate-100 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <Typography.Text className="block text-sm font-medium text-slate-900">
-                {item.label}
-              </Typography.Text>
-              {item.note ? <Typography.Text className="text-xs text-slate-500">{item.note}</Typography.Text> : null}
+      {isMobile ? (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={item.key} className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Typography.Text className="block text-sm font-medium text-slate-900">
+                    {item.label}
+                  </Typography.Text>
+                  <Typography.Text className="block text-xs text-slate-500">
+                    {labels.type}: {item.typeLabel}
+                  </Typography.Text>
+                  {item.note ? <Typography.Text className="block text-xs text-slate-500">{item.note}</Typography.Text> : null}
+                </div>
+
+                <Typography.Text className="shrink-0 text-right text-sm font-semibold text-slate-900">
+                  {formatCurrencyVnd(item.amount, locale)}
+                </Typography.Text>
+              </div>
             </div>
-            <Typography.Text className="text-sm text-slate-600">{item.typeLabel}</Typography.Text>
-            <Typography.Text className="text-right text-sm font-semibold text-slate-900">
-              {formatCurrencyVnd(item.amount, locale)}
-            </Typography.Text>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+          <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <span>{labels.label}</span>
+            <span>{labels.type}</span>
+            <span className="text-right">{labels.amount}</span>
           </div>
-        ))}
-      </div>
+
+          {items.map((item) => (
+            <div
+              key={item.key}
+              className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 border-t border-slate-100 px-4 py-3"
+            >
+              <div className="min-w-0">
+                <Typography.Text className="block text-sm font-medium text-slate-900">
+                  {item.label}
+                </Typography.Text>
+                {item.note ? <Typography.Text className="text-xs text-slate-500">{item.note}</Typography.Text> : null}
+              </div>
+              <Typography.Text className="text-sm text-slate-600">{item.typeLabel}</Typography.Text>
+              <Typography.Text className="text-right text-sm font-semibold text-slate-900">
+                {formatCurrencyVnd(item.amount, locale)}
+              </Typography.Text>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 export function BookingDetailContent({ booking }: { booking: Booking }) {
   const { t, i18n } = useTranslation()
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
   const locale = i18n.resolvedLanguage?.startsWith('vi') ? 'vi-VN' : 'en-GB'
 
   const startDate = toDate(booking.startDate)
@@ -218,8 +248,8 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
   }))
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
+    <div className="space-y-5 md:space-y-6">
+      <div className={isMobile ? 'rounded-2xl border border-slate-200/80 bg-slate-50 p-3.5' : 'space-y-3'}>
         <div className="flex flex-wrap items-center gap-2">
           <Typography.Title level={4} className="!mb-0 !text-slate-900">
             {booking.bookingCode}
@@ -236,6 +266,29 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
         <Typography.Paragraph className="!mb-0 text-slate-600">
           {startDate && endDate ? `${formatDateTime(startDate)} → ${formatDateTime(endDate)}` : t('bookings.details.noValue')}
         </Typography.Paragraph>
+
+        {isMobile ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+              <Typography.Text className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                {t('bookings.details.customer')}
+              </Typography.Text>
+              <div className="mt-1 text-sm font-medium text-slate-900">
+                {booking.customerSnapshot?.fullName ?? t('bookings.details.noValue')}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+              <Typography.Text className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                {t('bookings.details.car')}
+              </Typography.Text>
+              <div className="mt-1 text-sm font-medium text-slate-900">
+                {[booking.carSnapshot?.plateNumber, booking.carSnapshot?.brand, booking.carSnapshot?.model]
+                  .filter(Boolean)
+                  .join(' • ') || t('bookings.details.noValue')}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Descriptions
@@ -334,36 +387,36 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
         <Typography.Text className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
           {t('bookings.details.paymentSummary')}
         </Typography.Text>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.fixedTotal')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.fixedTotal)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.surchargeTotal')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.extraChargesTotal)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.adjustmentTotal')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-rose-600">{formatCurrency(financials.discountRefundTotal)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.total')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.totalPrice)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.paidAmount')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(financials.paidAmount)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.remainingAmount')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-amber-700">{formatCurrency(financials.remainingAmount)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.refundAmount')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.refundAmount)}</div>
           </div>
-          <div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.securityDeposit')}</Typography.Text>
             <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.securityDeposit)}</div>
           </div>
@@ -440,16 +493,26 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
 
 export function BookingDetailDrawer({ booking, open, onClose, onEdit }: BookingDetailDrawerProps) {
   const { t } = useTranslation()
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
       title={t('bookings.details.title')}
-      size="large"
+      placement={isMobile ? 'bottom' : 'right'}
+      size={isMobile ? undefined : 'large'}
+      height={isMobile ? '92vh' : undefined}
+      styles={{ body: { padding: isMobile ? 12 : 24 } }}
       extra={
         booking ? (
-          <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(booking)}>
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => onEdit(booking)}
+            size={isMobile ? 'large' : 'middle'}
+          >
             {t('common.actions.edit')}
           </Button>
         ) : null

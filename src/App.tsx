@@ -4,6 +4,8 @@ import viVN from 'antd/locale/vi_VN'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import './assets/_app.scss'
+
 import { AppShell } from './components/auth/AppShell'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { PublicOnlyRoute } from './components/auth/PublicOnlyRoute'
@@ -93,12 +95,15 @@ export default function App() {
           colorBgContainer: 'rgba(255, 255, 255, 0.92)',
           borderRadius: 16,
           borderRadiusLG: 24,
+          controlHeight: 44,
+          controlHeightLG: 48,
+          fontSize: 15,
           wireframe: false,
           fontFamily: 'Space Grotesk, Source Sans 3, sans-serif',
         },
         components: {
           Button: {
-            controlHeight: 42,
+            controlHeight: 44,
             fontWeight: 600,
           },
           Card: {

@@ -17,6 +17,7 @@ import {
   CarOutlined,
   LogoutOutlined,
   MenuOutlined,
+  PlusOutlined,
   TagsOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
@@ -71,6 +72,8 @@ export function AppShell() {
   const screens = Grid.useBreakpoint()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const activeLanguage = i18n.resolvedLanguage?.startsWith('vi') ? 'vi' : 'en'
+  const isCompactHeader = !screens.md
+  const isMobile = screens.md === false;
 
   const items: MenuProps['items'] = useMemo(() => {
     const baseItems: MenuProps['items'] = [
@@ -104,20 +107,30 @@ export function AppShell() {
     returnObjects: true,
   }) as string[]
 
-  const breadcrumbItems = routeBreadcrumbs.map((item) => ({
-    title: <span className="text-slate-500">{item}</span>,
+  const visibleBreadcrumbs = isCompactHeader
+    ? routeBreadcrumbs.slice(-1)
+    : !screens.lg
+      ? routeBreadcrumbs.slice(-2)
+      : routeBreadcrumbs
+
+  const breadcrumbItems = visibleBreadcrumbs.map((item) => ({
+    title: (
+      <span className={`mobile-clamp-1 text-slate-500 ${isCompactHeader ? 'max-w-[140px]' : 'max-w-[220px]'}`}>
+        {item}
+      </span>
+    ),
   }))
 
   const renderSidebarContent = () => (
-    <div className="flex h-full flex-col px-4 py-5 text-slate-50">
-      <div className="mb-5 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(15,118,110,0.18))] p-4 backdrop-blur">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-teal-300">
+    <div className="mobile-safe-bottom flex h-full flex-col px-3 py-4 text-slate-50 sm:px-4 sm:py-5">
+      <div className="mb-4 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(15,118,110,0.18))] p-3.5 backdrop-blur sm:mb-5 sm:rounded-[24px] sm:p-4">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-teal-300 sm:text-[11px] sm:tracking-[0.32em]">
           {publicDomain}
         </p>
-        <Typography.Title level={3} className="!mb-2 !text-white">
+        <Typography.Title level={screens.lg ? 3 : 4} className="!mb-1.5 !text-white sm:!mb-2">
           {t('common.appName')}
         </Typography.Title>
-        <Typography.Paragraph className="!mb-0 !text-slate-300">
+        <Typography.Paragraph className="!mb-0 !text-sm !text-slate-300">
           {t('shell.sidebarDescription')}
         </Typography.Paragraph>
       </div>
@@ -178,15 +191,15 @@ export function AppShell() {
         onClose={() => setMobileNavOpen(false)}
         placement="left"
         closable={false}
-        size="default"
+        width={screens.sm ? 320 : 'calc(100vw - 40px)'}
         styles={{ body: { padding: 0, background: '#020617' } }}
       >
         {renderSidebarContent()}
       </Drawer>
 
       <Layout className="app-shell-bg h-screen overflow-hidden">
-        <Header className="z-20 flex h-auto items-center justify-between gap-4 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+        <Header className="z-20 flex h-auto items-center justify-between gap-3 border-b border-slate-200/70 bg-white/85 px-3 py-2.5 backdrop-blur sm:px-4 sm:py-3 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             {!screens.lg ? (
               <Button
                 type="text"
@@ -196,22 +209,34 @@ export function AppShell() {
               />
             ) : null}
 
-            <div className="min-w-0 space-y-1">
-              <Breadcrumb items={breadcrumbItems} />
-              <div>
-                <Typography.Title level={3} className="!mb-0 !truncate !text-slate-900">
-                  {routeTitle}
-                </Typography.Title>
-                {/* Hidden */}
-                {/* <Typography.Paragraph className="!mb-0 !truncate !text-sm !text-slate-500">
-                  {routeDescription}
-                </Typography.Paragraph> */}
-              </div>
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              {!isMobile ? (
+                <>
+                  <Breadcrumb items={breadcrumbItems} className="min-w-0" />
+                  <div>
+                    <Typography.Title
+                      level={isCompactHeader ? 4 : 3}
+                      className="!mb-0 !truncate !text-slate-900 !text-xl sm:!text-2xl lg:!text-3xl"
+                    >
+                      {routeTitle}
+                    </Typography.Title>
+                  </div>
+                </>
+              )
+                : (
+                  <Typography.Title
+                    level={3}
+                    className="!mb-0 !truncate !text-slate-900 !text-lg sm:!text-xl"
+                  >
+                    {routeTitle}
+                  </Typography.Title>
+                )
+              }
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <LanguageSwitcher />
+          <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-wrap">
+            {!isMobile && <LanguageSwitcher />}
 
             <div className="hidden rounded-full border border-slate-200/70 bg-white px-3 py-1.5 text-sm text-slate-600 lg:block">
               {t('common.labels.today')} •{' '}
@@ -224,14 +249,42 @@ export function AppShell() {
               </span>
             </div>
 
-            <Tag className="m-0 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-teal-700">
+            <Tag className="m-0 hidden rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-teal-700 sm:inline-flex">
               {t(`common.roles.${profile?.role ?? 'unknown'}`)}
             </Tag>
           </div>
         </Header>
 
-        <Content className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4 lg:px-8 lg:pb-8">
-          <div className="mx-auto w-full max-w-[1440px] space-y-6">
+        <Content className="mobile-page-padding mobile-safe-bottom min-h-0 flex-1 overflow-y-auto px-0 pb-6 pt-3 sm:pt-4 lg:px-8 lg:pb-8">
+          <div className="mx-auto w-full max-w-[1440px] space-y-4 sm:space-y-6">
+            {/* {!screens.lg ? (
+              <div className="sticky top-0 z-10 -mx-0.5 lg:hidden">
+                <div className="mobile-action-group rounded-[18px] border border-slate-200/80 bg-white/88 p-2 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] backdrop-blur">
+                  <Button
+                    type={location.pathname.startsWith('/bookings') && location.pathname !== '/bookings/new' ? 'primary' : 'default'}
+                    icon={<CalendarOutlined />}
+                    onClick={() => navigate('/bookings')}
+                  >
+                    {t('shell.menu.bookings')}
+                  </Button>
+                  <Button
+                    type={location.pathname.startsWith('/cars') ? 'primary' : 'default'}
+                    icon={<CarOutlined />}
+                    onClick={() => navigate('/cars')}
+                  >
+                    {t('shell.menu.cars')}
+                  </Button>
+                  <Button
+                    type={location.pathname === '/bookings/new' ? 'primary' : 'default'}
+                    icon={<PlusOutlined />}
+                    onClick={() => navigate('/bookings/new')}
+                  >
+                    {t('bookings.page.create')}
+                  </Button>
+                </div>
+              </div>
+            ) : null} */}
+
             {/* {!currentUser?.emailVerified ? (
               <Alert
                 className="rounded-2xl border border-amber-200 bg-amber-50"

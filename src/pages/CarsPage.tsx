@@ -5,7 +5,7 @@ import {
   PlusOutlined,
   ToolOutlined,
 } from '@ant-design/icons'
-import { App, Button } from 'antd'
+import { App, Button, Grid } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { collection, deleteDoc, doc, onSnapshot, query } from 'firebase/firestore'
@@ -18,6 +18,7 @@ import { db } from '../services/firebase'
 import { Car } from '../types/Car'
 
 export function CarsPage() {
+  const screens = Grid.useBreakpoint()
   const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
@@ -111,26 +112,28 @@ export function CarsPage() {
         </Button>
       </section> */}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          label={t('cars.metrics.total')}
-          value={cars.length}
-          hint={t('cars.metrics.totalHint')}
-          icon={<CarOutlined />}
-        />
-        <MetricCard
-          label={t('cars.metrics.available')}
-          value={availableCount}
-          hint={t('cars.metrics.availableHint')}
-          icon={<CheckCircleOutlined />}
-        />
-        <MetricCard
-          label={t('cars.metrics.service')}
-          value={inServiceCount}
-          hint={t('cars.metrics.serviceHint')}
-          icon={<ToolOutlined />}
-        />
-      </div>
+      {(screens.md || screens.lg) && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            label={t('cars.metrics.total')}
+            value={cars.length}
+            hint={t('cars.metrics.totalHint')}
+            icon={<CarOutlined />}
+          />
+          <MetricCard
+            label={t('cars.metrics.available')}
+            value={availableCount}
+            hint={t('cars.metrics.availableHint')}
+            icon={<CheckCircleOutlined />}
+          />
+          <MetricCard
+            label={t('cars.metrics.service')}
+            value={inServiceCount}
+            hint={t('cars.metrics.serviceHint')}
+            icon={<ToolOutlined />}
+          />
+        </div>
+      )}
 
       <SectionCard
         title={t('cars.page.inventoryTitle')}

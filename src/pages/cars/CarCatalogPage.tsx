@@ -5,7 +5,7 @@ import {
   PlusOutlined,
   TagsOutlined,
 } from '@ant-design/icons'
-import { App, Button, Modal } from 'antd'
+import { App, Button, Grid, Modal } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { BrandForm, type BrandFormValues } from '../../components/brands/BrandForm'
@@ -22,6 +22,7 @@ import { CarBrand } from '../../types/Brand'
 import { CarModel } from '../../types/Model'
 
 export function CarCatalogPage() {
+  const screens = Grid.useBreakpoint()
   const { brands, loading: brandsLoading } = useCarBrands({ includeInactive: true })
   const { models, loading: modelsLoading } = useCarModels(undefined, { includeInactive: true })
   const [selectedBrandId, setSelectedBrandId] = useState<string | undefined>()
@@ -138,26 +139,29 @@ export function CarCatalogPage() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          label={t('brands.metrics.total')}
-          value={brands.length}
-          hint={t('catalog.page.totalBrandsHint')}
-          icon={<TagsOutlined />}
-        />
-        <MetricCard
-          label={t('brands.metrics.active')}
-          value={activeBrandCount}
-          hint={t('catalog.page.activeBrandsHint')}
-          icon={<CheckCircleOutlined />}
-        />
-        <MetricCard
-          label={t('models.metrics.total')}
-          value={models.length}
-          hint={t('catalog.page.totalModelsHint')}
-          icon={<ApartmentOutlined />}
-        />
-      </div>
+      {(screens.md || screens.lg) && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            label={t('brands.metrics.total')}
+            value={brands.length}
+            hint={t('catalog.page.totalBrandsHint')}
+            icon={<TagsOutlined />}
+          />
+          <MetricCard
+            label={t('brands.metrics.active')}
+            value={activeBrandCount}
+            hint={t('catalog.page.activeBrandsHint')}
+            icon={<CheckCircleOutlined />}
+          />
+          <MetricCard
+            label={t('models.metrics.total')}
+            value={models.length}
+            hint={t('catalog.page.totalModelsHint')}
+            icon={<ApartmentOutlined />}
+          />
+        </div>
+      )}
+
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <SectionCard

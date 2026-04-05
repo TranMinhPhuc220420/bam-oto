@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircleOutlined, PlusOutlined, TagsOutlined } from '@ant-design/icons'
-import { App, Button, Modal } from 'antd'
+import { App, Button, Grid, Modal } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
   addDoc,
@@ -27,6 +27,7 @@ function normalizeName(value: string) {
 }
 
 export function CarBrandsPage() {
+  const screens = Grid.useBreakpoint()
   const [brands, setBrands] = useState<CarBrand[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -141,27 +142,28 @@ export function CarBrandsPage() {
           {t('brands.page.add')}
         </Button>
       </section> */}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          label={t('brands.metrics.total')}
-          value={brands.length}
-          hint={t('brands.metrics.totalHint')}
-          icon={<TagsOutlined />}
-        />
-        <MetricCard
-          label={t('brands.metrics.active')}
-          value={activeCount}
-          hint={t('brands.metrics.activeHint')}
-          icon={<CheckCircleOutlined />}
-        />
-        <MetricCard
-          label={t('brands.metrics.inactive')}
-          value={inactiveCount}
-          hint={t('brands.metrics.inactiveHint')}
-          icon={<TagsOutlined />}
-        />
-      </div>
+      {(screens.md || screens.lg) && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            label={t('brands.metrics.total')}
+            value={brands.length}
+            hint={t('brands.metrics.totalHint')}
+            icon={<TagsOutlined />}
+          />
+          <MetricCard
+            label={t('brands.metrics.active')}
+            value={activeCount}
+            hint={t('brands.metrics.activeHint')}
+            icon={<CheckCircleOutlined />}
+          />
+          <MetricCard
+            label={t('brands.metrics.inactive')}
+            value={inactiveCount}
+            hint={t('brands.metrics.inactiveHint')}
+            icon={<TagsOutlined />}
+          />
+        </div>
+      )}
 
       <SectionCard
         title={t('brands.page.directoryTitle')}

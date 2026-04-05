@@ -9,6 +9,9 @@
   --color-surface: rgba(255, 255, 255, 0.82);
   --color-surface-strong: rgba(255, 255, 255, 0.92);
   --shadow-soft: 0 24px 70px -40px rgba(15, 23, 42, 0.45);
+  --page-gutter-x: 16px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   font-family: 'Source Sans 3', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -72,6 +75,49 @@ a {
   isolation: isolate;
 }
 
+.mobile-page-padding {
+  padding-inline: var(--page-gutter-x);
+}
+
+.mobile-safe-bottom {
+  padding-bottom: calc(var(--safe-area-bottom) + 1rem);
+}
+
+.mobile-sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
+  margin-top: 1rem;
+  padding: 0.75rem 0 calc(var(--safe-area-bottom) + 0.3rem);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0) 0%, rgba(248, 250, 252, 0.92) 26%, rgba(248, 250, 252, 0.98) 100%);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.mobile-card-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 5px;
+}
+
+.mobile-clamp-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .app-shell-bg {
   background:
     radial-gradient(circle at top left, rgba(45, 212, 191, 0.1), transparent 20%),
@@ -118,4 +164,29 @@ a {
 
 .data-table .ant-table-pagination {
   padding: 0 20px 16px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-gutter-x: 14px;
+  }
+
+  .mobile-action-group {
+    width: 100%;
+  }
+
+  .mobile-action-group > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .data-table .ant-table-pagination {
+    padding: 0 12px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --page-gutter-x: 12px;
+  }
 }

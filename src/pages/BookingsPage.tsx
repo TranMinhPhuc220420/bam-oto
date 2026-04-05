@@ -5,9 +5,10 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   PlusOutlined,
+  UnorderedListOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { App, Button, Segmented } from 'antd'
+import { App, Button, Segmented, Grid } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -50,6 +51,8 @@ export function BookingsPage() {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const { profile } = useAuth()
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
   const { bookings, loading } = useBookings()
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [searchText, setSearchText] = useState('')
@@ -202,73 +205,89 @@ export function BookingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label={t('bookings.metrics.pickups')}
-          value={todayPickupsCount}
-          hint={t('bookings.metrics.pickupsHint')}
-          icon={<CalendarOutlined />}
-        />
-        <MetricCard
-          label={t('bookings.metrics.returns')}
-          value={todayReturnsCount}
-          hint={t('bookings.metrics.returnsHint')}
-          icon={<ClockCircleOutlined />}
-        />
-        <MetricCard
-          label={t('bookings.metrics.active')}
-          value={activeCount}
-          hint={t('bookings.metrics.activeHint')}
-          icon={<CheckCircleOutlined />}
-        />
-        <MetricCard
-          label={t('bookings.metrics.overdue')}
-          value={overdueCount}
-          hint={t('bookings.metrics.overdueHint')}
-          icon={<WarningOutlined />}
-        />
-      </div>
+    <div className="space-y-4 sm:space-y-6">
+      {screens.md && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label={t('bookings.metrics.pickups')}
+            value={todayPickupsCount}
+            hint={t('bookings.metrics.pickupsHint')}
+            icon={<CalendarOutlined />}
+          />
+          <MetricCard
+            label={t('bookings.metrics.returns')}
+            value={todayReturnsCount}
+            hint={t('bookings.metrics.returnsHint')}
+            icon={<ClockCircleOutlined />}
+          />
+          <MetricCard
+            label={t('bookings.metrics.active')}
+            value={activeCount}
+            hint={t('bookings.metrics.activeHint')}
+            icon={<CheckCircleOutlined />}
+          />
+          <MetricCard
+            label={t('bookings.metrics.overdue')}
+            value={overdueCount}
+            hint={t('bookings.metrics.overdueHint')}
+            icon={<WarningOutlined />}
+          />
+        </div>
+      )}
 
       <SectionCard
         title={t('bookings.page.directoryTitle')}
         description={t('bookings.page.directoryDescription')}
         actions={
-          <>
+          <div className="flex w-full items-center justify-between gap-2 sm:gap-4">
             <Segmented<'list' | 'calendar'>
+              size={screens.md ? 'middle' : 'small'}
               value={viewMode}
               onChange={(value) => setViewMode(value)}
               options={[
-                { label: t('bookings.page.listView'), value: 'list' },
-                { label: t('bookings.page.calendarView'), value: 'calendar' },
+                {
+                  label: screens.sm ? t('bookings.page.listView') : <UnorderedListOutlined aria-label={t('bookings.page.listView')} />,
+                  value: 'list',
+                },
+                {
+                  label: screens.sm ? t('bookings.page.calendarView') : <CalendarOutlined aria-label={t('bookings.page.calendarView')} />,
+                  value: 'calendar',
+                },
               ]}
             />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/bookings/new')}
-              size="large"
-              className="rounded-full px-6"
-            >
-              {t('bookings.page.create')}
-            </Button>
-          </>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate('/bookings/new')}
+                size={isMobile ? 'small' : 'middle'}
+                aria-label={t('bookings.page.create')}
+                className="shrink-0 rounded-full px-3 sm:px-6"
+              >
+                {t('bookings.page.create')}
+              </Button>
+              <BookingFilters
+                searchText={searchText}
+                onSearchTextChange={setSearchText}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                paymentFilter={paymentFilter}
+                onPaymentFilterChange={setPaymentFilter}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                quickFilter={quickFilter}
+                onQuickFilterChange={setQuickFilter}
+                resultCount={filteredBookings.length}
+                onReset={resetFilters}
+              />
+            </div>
+          </div>
         }
       >
-        <BookingFilters
-          searchText={searchText}
-          onSearchTextChange={setSearchText}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          paymentFilter={paymentFilter}
-          onPaymentFilterChange={setPaymentFilter}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          quickFilter={quickFilter}
-          onQuickFilterChange={setQuickFilter}
-          resultCount={filteredBookings.length}
-          onReset={resetFilters}
-        />
+        <div className="border-b border-slate-200/70 px-4 py-2 text-xs text-slate-500 sm:px-6">
+          {t('bookings.filters.results', { count: filteredBookings.length })}
+        </div>
 
         {viewMode === 'list' ? (
           <BookingList

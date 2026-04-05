@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ApartmentOutlined, CheckCircleOutlined, PlusOutlined, TagsOutlined } from '@ant-design/icons'
-import { App, Button, Modal } from 'antd'
+import { App, Button, Grid, Modal } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
   addDoc,
@@ -28,6 +28,7 @@ function normalizeName(value: string) {
 }
 
 export function CarModelsPage() {
+  const screens = Grid.useBreakpoint()
   const { brands, loading: brandsLoading } = useCarBrands({ includeInactive: true })
   const { models, loading: modelsLoading } = useCarModels(undefined, { includeInactive: true })
   const [saving, setSaving] = useState(false)
@@ -148,26 +149,29 @@ export function CarModelsPage() {
         </Button>
       </section> */}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          label={t('models.metrics.total')}
-          value={models.length}
-          hint={t('models.metrics.totalHint')}
-          icon={<ApartmentOutlined />}
-        />
-        <MetricCard
-          label={t('models.metrics.active')}
-          value={activeModelCount}
-          hint={t('models.metrics.activeHint')}
-          icon={<CheckCircleOutlined />}
-        />
-        <MetricCard
-          label={t('models.metrics.linkedBrands')}
-          value={linkedBrandCount}
-          hint={t('models.metrics.linkedBrandsHint')}
-          icon={<TagsOutlined />}
-        />
-      </div>
+      {(screens.md || screens.lg) && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            label={t('models.metrics.total')}
+            value={models.length}
+            hint={t('models.metrics.totalHint')}
+            icon={<ApartmentOutlined />}
+          />
+          <MetricCard
+            label={t('models.metrics.active')}
+            value={activeModelCount}
+            hint={t('models.metrics.activeHint')}
+            icon={<CheckCircleOutlined />}
+          />
+          <MetricCard
+            label={t('models.metrics.linkedBrands')}
+            value={linkedBrandCount}
+            hint={t('models.metrics.linkedBrandsHint')}
+            icon={<TagsOutlined />}
+          />
+        </div>
+      )}
+
 
       <SectionCard
         title={t('models.page.directoryTitle')}

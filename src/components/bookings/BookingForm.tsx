@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import {
   CalendarOutlined,
   CarOutlined,
@@ -9,7 +9,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Empty, Form, Input, InputNumber, Select, Spin, Steps, Tag, Typography } from 'antd'
+import { App, Button, DatePicker, Empty, Form, Grid, Input, InputNumber, Select, Spin, Steps, Tag, TimePicker, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { useBookings } from '../../hooks/useBookings'
@@ -79,6 +79,19 @@ const carReturnStatuses: BookingReturnCarStatus[] = ['available', 'cleaning', 'r
 const paymentMethods: PaymentMethod[] = ['cash', 'bank-transfer', 'card', 'other']
 const chargeTypes: BookingExtraChargeType[] = ['fuel', 'late-fee', 'damage', 'cleaning', 'toll', 'other']
 const adjustmentTypes: BookingAdjustmentType[] = ['discount', 'refund', 'waiver', 'other']
+const bookingStatusColors: Record<BookingStatus, string> = {
+  draft: 'default',
+  confirmed: 'green',
+  'in-progress': 'blue',
+  completed: 'purple',
+  canceled: 'red',
+}
+const paymentStatusColors: Record<PaymentStatus, string> = {
+  unpaid: 'gold',
+  partial: 'cyan',
+  paid: 'green',
+  refunded: 'volcano',
+}
 
 type BookedRange = {
   start: Dayjs
@@ -226,6 +239,8 @@ export function BookingForm({
 }: BookingFormProps) {
   const [form] = Form.useForm<BookingFormValues>()
   const { t, i18n } = useTranslation()
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
   const { modal } = App.useApp()
   const { bookings: activeBookings } = useBookings({ statuses: blockingBookingStatuses })
   const { cars, loading: carsLoading } = useCars()
@@ -238,6 +253,8 @@ export function BookingForm({
   const isExistingBooking = Boolean(currentBooking?.id)
   const currentBookingStatus =
     (Form.useWatch('status', form) as BookingStatus | undefined) ?? initialValues?.status ?? 'draft'
+  const currentPaymentStatus =
+    (Form.useWatch('paymentStatus', form) as PaymentStatus | undefined) ?? initialValues?.paymentStatus ?? 'unpaid'
   const isReadOnlyBooking = currentBooking?.status === 'completed' || currentBooking?.status === 'canceled'
   const isIdentityLocked = isExistingBooking
   const requiresCarReturnStatus = currentBookingStatus === 'completed' || currentBookingStatus === 'canceled'
@@ -338,6 +355,39 @@ export function BookingForm({
   }, [currentBookingStatus, form])
 
   const selectedCar = useMemo(() => cars.find((car) => car.id === selectedCarId), [cars, selectedCarId])
+  const mobileScheduleSummary = useMemo(() => {
+    if (!selectedStartDate && !selectedEndDate) {
+      return '—'
+    }
+
+    const startLabel = selectedStartDate ? selectedStartDate.format('DD/MM HH:mm') : '—'
+    const endLabel = selectedEndDate ? selectedEndDate.format('DD/MM HH:mm') : '—'
+
+    return `${startLabel} → ${endLabel}`
+  }, [selectedEndDate, selectedStartDate])
+  const renderMobileSectionIntro = (title: string, description?: string, aside?: ReactNode) => {
+    if (!isMobile) {
+      return null
+    }
+
+    return (
+      <div className="border-b border-slate-200/70 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Typography.Title level={5} className="!mb-1 !text-base !text-slate-900">
+              {title}
+            </Typography.Title>
+            {description ? (
+              <Typography.Paragraph className="!mb-0 text-xs leading-5 text-slate-500">
+                {description}
+              </Typography.Paragraph>
+            ) : null}
+          </div>
+          {aside ? <div className="shrink-0">{aside}</div> : null}
+        </div>
+      </div>
+    )
+  }
   const blockedRanges = useMemo(() => {
     if (!selectedCarId) {
       return []
@@ -490,6 +540,25 @@ export function BookingForm({
     },
   ]
 
+  const updateDateTimeField = (fieldName: 'startDate' | 'endDate', part: 'date' | 'time', value: Dayjs | null) => {
+    if (!value) {
+      form.setFieldValue(fieldName, undefined)
+      return
+    }
+
+    const currentValue = form.getFieldValue(fieldName) as Dayjs | undefined
+    const fallbackBase =
+      fieldName === 'endDate' && selectedStartDate ? selectedStartDate.add(1, 'minute') : dayjs().add(1, 'minute')
+    const baseValue = currentValue ?? fallbackBase
+    const nextValue =
+      part === 'date'
+        ? value.hour(baseValue.hour()).minute(baseValue.minute()).second(0).millisecond(0)
+        : baseValue.hour(value.hour()).minute(value.minute()).second(0).millisecond(0)
+
+    form.setFieldValue(fieldName, nextValue)
+    void form.validateFields([fieldName]).catch(() => undefined)
+  }
+
   const handleCarChange = (value: string) => {
     const car = cars.find((entry) => entry.id === value)
 
@@ -580,6 +649,7 @@ export function BookingForm({
         layout="vertical"
         onFinish={handleFinish}
         disabled={isLoading || isReadOnlyBooking}
+        className={isMobile ? 'mobile-safe-bottom' : undefined}
         initialValues={{
           status: 'draft',
           paymentStatus: 'unpaid',
@@ -621,12 +691,76 @@ export function BookingForm({
         <InputNumber />
       </Form.Item>
 
+      {isMobile ? (
+        <div className="mobile-card-list mb-4 gap-2.5">
+          <div className="rounded-[20px] border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Tag color={bookingStatusColors[currentBookingStatus]} className="!mr-0 rounded-full px-3 py-1 font-medium">
+                {t(`bookings.status.${currentBookingStatus}`)}
+              </Tag>
+              <Tag color={paymentStatusColors[currentPaymentStatus]} className="!mr-0 rounded-full px-3 py-1 font-medium">
+                {t(`bookings.paymentStatus.${currentPaymentStatus}`)}
+              </Tag>
+            </div>
+
+            <div className="mt-3 space-y-2.5 text-sm text-slate-600">
+              <div className="flex items-start gap-2.5">
+                <CarOutlined className="mt-0.5 text-slate-400" />
+                <div className="min-w-0">
+                  <div className="mobile-clamp-1 font-medium text-slate-900">
+                    {selectedCar
+                      ? `${selectedCar.plateNumber} • ${[selectedCar.brand, selectedCar.model].filter(Boolean).join(' ')}`
+                      : '—'}
+                  </div>
+                  <div className="mobile-clamp-2 text-xs text-slate-500">
+                    {selectedCar ? t(`cars.list.statusLabels.${selectedCar.status}`) : t('bookings.form.carPlaceholder')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <CalendarOutlined className="mt-0.5 text-slate-400" />
+                <div className="text-xs leading-5 text-slate-500">{mobileScheduleSummary}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-[18px] border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+              <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {t('bookings.finance.total')}
+              </Typography.Text>
+              <div className="mt-1 text-base font-semibold text-slate-900">
+                {formatCurrencyVnd(calculatedTotal, i18n.resolvedLanguage)}
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-amber-100 bg-amber-50/70 px-3.5 py-3 shadow-sm">
+              <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
+                {t('bookings.finance.remaining')}
+              </Typography.Text>
+              <div className="mt-1 text-base font-semibold text-amber-800">
+                {formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <SectionCard
         className="mb-6"
         title={t('bookings.form.progressTitle')}
         description={t('bookings.form.progressDescription')}
       >
-        <div className="space-y-4 p-4 sm:p-5">
+        {renderMobileSectionIntro(
+          t('bookings.form.progressTitle'),
+          t('bookings.form.progressDescription'),
+          <Tag color={bookingStatusColors[currentBookingStatus]} className="!mr-0 rounded-full px-3 py-1 font-medium">
+            {t(`bookings.status.${currentBookingStatus}`)}
+          </Tag>
+        )}
+
+        <div className={isMobile ? 'space-y-3 p-3.5' : 'space-y-4 p-4 sm:p-5'}>
           {currentBookingStatus === 'canceled' ? (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
               <Tag color="red" icon={<StopOutlined />} className="!mr-0 rounded-full px-3 py-1 font-medium">
@@ -640,9 +774,18 @@ export function BookingForm({
 
           <Steps
             current={currentProgressStep}
-            responsive
-            items={bookingProgressItems}
-            className="[&_.ant-steps-item-description]:!max-w-[220px] [&_.ant-steps-item-description]:!text-xs [&_.ant-steps-item-description]:!leading-5 [&_.ant-steps-item-icon]:!h-8 [&_.ant-steps-item-icon]:!w-8 [&_.ant-steps-item-title]:!text-sm [&_.ant-steps-item-title]:!font-semibold"
+            direction={isMobile ? 'vertical' : 'horizontal'}
+            responsive={!isMobile}
+            size={isMobile ? 'small' : 'default'}
+            items={bookingProgressItems.map((item) => ({
+              ...item,
+              description: isMobile ? undefined : item.description,
+            }))}
+            className={
+              isMobile
+                ? '[&_.ant-steps-item-description]:hidden [&_.ant-steps-item-icon]:!h-7 [&_.ant-steps-item-icon]:!w-7 [&_.ant-steps-item-tail]:!ps-3.5 [&_.ant-steps-item-title]:!text-sm [&_.ant-steps-item-title]:!font-semibold'
+                : '[&_.ant-steps-item-description]:!max-w-[220px] [&_.ant-steps-item-description]:!text-xs [&_.ant-steps-item-description]:!leading-5 [&_.ant-steps-item-icon]:!h-8 [&_.ant-steps-item-icon]:!w-8 [&_.ant-steps-item-title]:!text-sm [&_.ant-steps-item-title]:!font-semibold'
+            }
           />
         </div>
       </SectionCard>
@@ -735,50 +878,163 @@ export function BookingForm({
         </Form.Item>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Form.Item
-          name="startDate"
-          label={t('bookings.form.startDate')}
-          rules={[{ required: true, message: t('bookings.form.validation.startDate') }]}
-        >
-          <DatePicker
-            showTime={{ format: 'HH:mm' }}
-            className="w-full"
-            format="DD/MM/YYYY HH:mm"
-            disabled={isIdentityLocked}
-            disabledDate={disableStartDate}
-            disabledTime={disableStartTime}
-          />
-        </Form.Item>
+      {isMobile ? (
+        <div className="grid gap-4">
+          <Form.Item
+            name="startDate"
+            hidden
+            rules={[{ required: true, message: t('bookings.form.validation.startDate') }]}
+          >
+            <DatePicker />
+          </Form.Item>
 
-        <Form.Item
-          name="endDate"
-          label={t('bookings.form.endDate')}
-          dependencies={['startDate']}
-          rules={[
-            { required: true, message: t('bookings.form.validation.endDate') },
-            ({ getFieldValue }) => ({
-              validator(_, value: Dayjs | undefined) {
-                const startDate = getFieldValue('startDate') as Dayjs | undefined
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const errors = form.getFieldError('startDate')
 
-                if (!value || !startDate || value.isAfter(startDate)) {
-                  return Promise.resolve()
-                }
+              return (
+                <Form.Item
+                  label={t('bookings.form.startDate')}
+                  required
+                  validateStatus={errors.length ? 'error' : undefined}
+                  help={errors[0]}
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DatePicker
+                      size="large"
+                      className="w-full"
+                      format="DD/MM/YYYY"
+                      value={selectedStartDate ?? null}
+                      disabled={isIdentityLocked}
+                      disabledDate={disableStartDate}
+                      inputReadOnly
+                      onChange={(value) => updateDateTimeField('startDate', 'date', value)}
+                    />
 
-                return Promise.reject(new Error(t('bookings.form.validation.endDateAfterStart')))
-              },
-            }),
-          ]}
-        >
-          <DatePicker
-            showTime={{ format: 'HH:mm' }}
-            className="w-full"
-            format="DD/MM/YYYY HH:mm"
-            disabledDate={disableEndDate}
-            disabledTime={disableEndTime}
-          />
-        </Form.Item>
-      </div>
+                    <TimePicker
+                      size="large"
+                      className="w-full"
+                      format="HH:mm"
+                      minuteStep={5}
+                      value={selectedStartDate ?? null}
+                      disabled={isIdentityLocked || !selectedStartDate}
+                      disabledTime={() => disableStartTime(selectedStartDate ?? null)}
+                      inputReadOnly
+                      onChange={(value) => updateDateTimeField('startDate', 'time', value)}
+                    />
+                  </div>
+                </Form.Item>
+              )
+            }}
+          </Form.Item>
+
+          <Form.Item
+            name="endDate"
+            hidden
+            dependencies={['startDate']}
+            rules={[
+              { required: true, message: t('bookings.form.validation.endDate') },
+              ({ getFieldValue }) => ({
+                validator(_, value: Dayjs | undefined) {
+                  const startDate = getFieldValue('startDate') as Dayjs | undefined
+
+                  if (!value || !startDate || value.isAfter(startDate)) {
+                    return Promise.resolve()
+                  }
+
+                  return Promise.reject(new Error(t('bookings.form.validation.endDateAfterStart')))
+                },
+              }),
+            ]}
+          >
+            <DatePicker />
+          </Form.Item>
+
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const errors = form.getFieldError('endDate')
+
+              return (
+                <Form.Item
+                  label={t('bookings.form.endDate')}
+                  required
+                  validateStatus={errors.length ? 'error' : undefined}
+                  help={errors[0]}
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DatePicker
+                      size="large"
+                      className="w-full"
+                      format="DD/MM/YYYY"
+                      value={selectedEndDate ?? null}
+                      disabledDate={disableEndDate}
+                      inputReadOnly
+                      onChange={(value) => updateDateTimeField('endDate', 'date', value)}
+                    />
+
+                    <TimePicker
+                      size="large"
+                      className="w-full"
+                      format="HH:mm"
+                      minuteStep={5}
+                      value={selectedEndDate ?? null}
+                      disabled={!selectedEndDate}
+                      disabledTime={() => disableEndTime(selectedEndDate ?? null)}
+                      inputReadOnly
+                      onChange={(value) => updateDateTimeField('endDate', 'time', value)}
+                    />
+                  </div>
+                </Form.Item>
+              )
+            }}
+          </Form.Item>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Form.Item
+            name="startDate"
+            label={t('bookings.form.startDate')}
+            rules={[{ required: true, message: t('bookings.form.validation.startDate') }]}
+          >
+            <DatePicker
+              showTime={{ format: 'HH:mm' }}
+              className="w-full"
+              format="DD/MM/YYYY HH:mm"
+              disabled={isIdentityLocked}
+              disabledDate={disableStartDate}
+              disabledTime={disableStartTime}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="endDate"
+            label={t('bookings.form.endDate')}
+            dependencies={['startDate']}
+            rules={[
+              { required: true, message: t('bookings.form.validation.endDate') },
+              ({ getFieldValue }) => ({
+                validator(_, value: Dayjs | undefined) {
+                  const startDate = getFieldValue('startDate') as Dayjs | undefined
+
+                  if (!value || !startDate || value.isAfter(startDate)) {
+                    return Promise.resolve()
+                  }
+
+                  return Promise.reject(new Error(t('bookings.form.validation.endDateAfterStart')))
+                },
+              }),
+            ]}
+          >
+            <DatePicker
+              showTime={{ format: 'HH:mm' }}
+              className="w-full"
+              format="DD/MM/YYYY HH:mm"
+              disabledDate={disableEndDate}
+              disabledTime={disableEndTime}
+            />
+          </Form.Item>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Form.Item
@@ -834,14 +1090,20 @@ export function BookingForm({
         </Form.Item>
       </div> */}
 
-      <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
-        <div>
-          <Typography.Title level={5} className="!mb-1 !text-slate-900">
-            {t('bookings.form.fixedChargesTitle')}
-          </Typography.Title>
-          <Typography.Paragraph className="!mb-0 text-sm text-slate-500">
-            {t('bookings.form.fixedChargesDescription')}
-          </Typography.Paragraph>
+      <div className={isMobile ? 'space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5' : 'space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4'}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Typography.Title level={5} className="!mb-1 !text-slate-900">
+              {t('bookings.form.fixedChargesTitle')}
+            </Typography.Title>
+            <Typography.Paragraph className="!mb-0 text-sm text-slate-500">
+              {t('bookings.form.fixedChargesDescription')}
+            </Typography.Paragraph>
+          </div>
+
+          <Tag color="blue" className="!mr-0 rounded-full px-3 py-1 font-medium">
+            {formatCurrencyVnd(fixedTotal, i18n.resolvedLanguage)}
+          </Tag>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -888,7 +1150,7 @@ export function BookingForm({
         </div>
       </div>
 
-      <div className="mt-6 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4">
+      <div className={isMobile ? 'mt-5 space-y-3 rounded-2xl border border-slate-200/80 bg-white p-3.5' : 'mt-6 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4'}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Typography.Title level={5} className="!mb-1 !text-slate-900">
@@ -898,6 +1160,10 @@ export function BookingForm({
               {t('bookings.form.surchargesDescription')}
             </Typography.Paragraph>
           </div>
+
+          <Tag color="processing" className="!mr-0 rounded-full px-3 py-1 font-medium">
+            {formatCurrencyVnd(extraCharges, i18n.resolvedLanguage)}
+          </Tag>
         </div>
 
         <Form.List name="extraChargeItems">
@@ -910,7 +1176,7 @@ export function BookingForm({
               {fields.map((field) => (
                 <div
                   key={field.key}
-                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 lg:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
+                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
                 >
                   <Form.Item name={[field.name, 'id']} hidden>
                     <Input />
@@ -946,8 +1212,14 @@ export function BookingForm({
                     <Input placeholder={t('bookings.form.lineItemNotePlaceholder')} />
                   </Form.Item>
 
-                  <div className="flex items-end">
-                    <Button danger disabled={isReadOnlyBooking} icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
+                  <div className="flex items-end md:justify-end">
+                    <Button
+                      danger
+                      block={isMobile}
+                      disabled={isReadOnlyBooking}
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(field.name)}
+                    >
                       {t('common.actions.delete')}
                     </Button>
                   </div>
@@ -955,7 +1227,7 @@ export function BookingForm({
               ))}
 
               {!isReadOnlyBooking ? (
-                <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createChargeRow())}>
+                <Button block={isMobile} type="dashed" icon={<PlusOutlined />} onClick={() => add(createChargeRow())}>
                   {t('bookings.form.addSurcharge')}
                 </Button>
               ) : null}
@@ -964,7 +1236,7 @@ export function BookingForm({
         </Form.List>
       </div>
 
-      <div className="mt-6 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4">
+      <div className={isMobile ? 'mt-5 space-y-3 rounded-2xl border border-slate-200/80 bg-white p-3.5' : 'mt-6 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4'}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Typography.Title level={5} className="!mb-1 !text-slate-900">
@@ -974,6 +1246,10 @@ export function BookingForm({
               {t('bookings.form.adjustmentsDescription')}
             </Typography.Paragraph>
           </div>
+
+          <Tag color="purple" className="!mr-0 rounded-full px-3 py-1 font-medium">
+            {formatCurrencyVnd(adjustmentTotal, i18n.resolvedLanguage)}
+          </Tag>
         </div>
 
         <Form.List name="adjustmentItems">
@@ -986,7 +1262,7 @@ export function BookingForm({
               {fields.map((field) => (
                 <div
                   key={field.key}
-                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 lg:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
+                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
                 >
                   <Form.Item name={[field.name, 'id']} hidden>
                     <Input />
@@ -1022,8 +1298,14 @@ export function BookingForm({
                     <Input placeholder={t('bookings.form.lineItemNotePlaceholder')} />
                   </Form.Item>
 
-                  <div className="flex items-end">
-                    <Button danger disabled={isReadOnlyBooking} icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
+                  <div className="flex items-end md:justify-end">
+                    <Button
+                      danger
+                      block={isMobile}
+                      disabled={isReadOnlyBooking}
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(field.name)}
+                    >
                       {t('common.actions.delete')}
                     </Button>
                   </div>
@@ -1031,7 +1313,7 @@ export function BookingForm({
               ))}
 
               {!isReadOnlyBooking ? (
-                <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createAdjustmentRow())}>
+                <Button block={isMobile} type="dashed" icon={<PlusOutlined />} onClick={() => add(createAdjustmentRow())}>
                   {t('bookings.form.addAdjustment')}
                 </Button>
               ) : null}
@@ -1062,7 +1344,15 @@ export function BookingForm({
         title={t('bookings.form.paymentTrackingTitle')}
         description={t('bookings.form.paymentTrackingDescription')}
       >
-        <div className="space-y-4 bg-emerald-50/60 p-4 sm:p-5">
+        {renderMobileSectionIntro(
+          t('bookings.form.paymentTrackingTitle'),
+          t('bookings.form.paymentTrackingDescription'),
+          <Tag color={paymentStatusColors[currentPaymentStatus]} className="!mr-0 rounded-full px-3 py-1 font-medium">
+            {t(`bookings.paymentStatus.${currentPaymentStatus}`)}
+          </Tag>
+        )}
+
+        <div className={isMobile ? 'space-y-3 bg-emerald-50/60 p-3.5' : 'space-y-4 bg-emerald-50/60 p-4 sm:p-5'}>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
               <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -1155,7 +1445,12 @@ export function BookingForm({
           hasTransactionHistory ? t('bookings.form.historyDescription') : t('bookings.form.historyCreateHint')
         }
       >
-        <div className="p-4 sm:p-5">
+        {renderMobileSectionIntro(
+          t('bookings.form.historyTitle'),
+          hasTransactionHistory ? t('bookings.form.historyDescription') : t('bookings.form.historyCreateHint')
+        )}
+
+        <div className={isMobile ? 'p-3.5' : 'p-4 sm:p-5'}>
           {hasTransactionHistory ? (
             <BookingTransactionList booking={currentBooking} bookingId={currentBooking?.id} />
           ) : (
@@ -1167,7 +1462,9 @@ export function BookingForm({
       </SectionCard>
 
       <SectionCard className="mt-6" title={t('bookings.form.documents')} description={t('bookings.upload.helper')}>
-        <div className="p-4 sm:p-5">
+        {renderMobileSectionIntro(t('bookings.form.documents'), t('bookings.upload.helper'))}
+
+        <div className={isMobile ? 'p-3.5' : 'p-4 sm:p-5'}>
           <Form.Item name="documentUrls" className="!mb-0">
             <BookingDocumentUpload readOnly={isReadOnlyBooking} onPersistChange={isReadOnlyBooking ? undefined : onDocumentUrlsChange} />
           </Form.Item>
@@ -1175,22 +1472,35 @@ export function BookingForm({
       </SectionCard>
 
       <SectionCard className="mt-6" title={t('bookings.form.note')}>
-        <div className="space-y-4 p-4 sm:p-5">
-          <Form.Item name="note" className="!mb-0">
-            <Input.TextArea rows={4} placeholder={t('bookings.form.notePlaceholder')} />
-          </Form.Item>
+        {renderMobileSectionIntro(t('bookings.form.note'))}
 
-          {!isReadOnlyBooking ? (
-            <Form.Item className="!mb-0">
-              <div className="flex justify-end">
-                <Button type="primary" htmlType="submit" loading={isLoading}>
-                  {initialValues ? t('bookings.form.submitUpdate') : t('bookings.form.submitCreate')}
-                </Button>
-              </div>
-            </Form.Item>
-          ) : null}
+        <div className={isMobile ? 'space-y-3 p-3.5' : 'space-y-4 p-4 sm:p-5'}>
+          <Form.Item name="note" className="!mb-0">
+            <Input.TextArea rows={isMobile ? 3 : 4} placeholder={t('bookings.form.notePlaceholder')} />
+          </Form.Item>
         </div>
       </SectionCard>
+
+      {!isReadOnlyBooking ? (
+        <div className={isMobile ? 'mobile-sticky-actions' : 'mt-6'}>
+          <div className="rounded-2xl border border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)] backdrop-blur">
+            <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between gap-4'}>
+              <div className="min-w-0">
+                <Typography.Text strong className="block text-sm text-slate-900">
+                  {t('bookings.finance.total')}: {formatCurrencyVnd(calculatedTotal, i18n.resolvedLanguage)}
+                </Typography.Text>
+                <Typography.Text className="block text-xs text-slate-500">
+                  {t('bookings.finance.remaining')}: {formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage)}
+                </Typography.Text>
+              </div>
+
+              <Button block={isMobile} size="large" type="primary" htmlType="submit" loading={isLoading}>
+                {initialValues ? t('bookings.form.submitUpdate') : t('bookings.form.submitCreate')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Form>
     </Spin>
   )

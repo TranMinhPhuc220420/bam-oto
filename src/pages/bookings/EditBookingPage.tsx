@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LeftOutlined } from '@ant-design/icons'
-import { App, Button, Card, Spin, Typography } from 'antd'
+import { App, Button, Card, Grid, Spin, Typography } from 'antd'
 import { deleteField, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -27,6 +27,8 @@ export function EditBookingPage() {
   const [booking, setBooking] = useState<Booking | null>(null)
   const { t } = useTranslation()
   const { message } = App.useApp()
+  const screen = Grid.useBreakpoint()
+  const isMobile = screen.md === false;
 
   useEffect(() => {
     const fetchBooking = async () => {
@@ -69,10 +71,10 @@ export function EditBookingPage() {
     setBooking((current) =>
       current
         ? {
-            ...current,
-            documentUrls,
-            documentUrl: documentUrls[0],
-          }
+          ...current,
+          documentUrls,
+          documentUrl: documentUrls[0],
+        }
         : current
     )
   }
@@ -173,11 +175,11 @@ export function EditBookingPage() {
 
   return (
     <div className="mx-auto">
-      <div className="mb-6 flex items-center space-x-4">
+      <div className="sm:mb-6 flex items-center space-x-4">
         <Button icon={<LeftOutlined />} type="text" onClick={() => navigate('/bookings')}>
-          {t('bookings.edit.back')}
+          {!isMobile && t('bookings.edit.back')}
         </Button>
-        <Title level={2} className="!mb-0 !mt-0 text-slate-900">
+        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
           {t('bookings.edit.title')}
         </Title>
       </div>
