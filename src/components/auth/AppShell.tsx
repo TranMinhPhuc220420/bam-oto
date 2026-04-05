@@ -39,6 +39,7 @@ type RouteKey =
   | 'bookings'
   | 'newBooking'
   | 'editBooking'
+  | 'bookingDetail'
   | 'finance'
   | 'newUser'
   | 'users'
@@ -55,6 +56,7 @@ const routeMeta: RouteMeta[] = [
   { path: '/cars', key: 'cars' },
   { path: '/bookings/new', key: 'newBooking' },
   { path: '/bookings/edit', key: 'editBooking' },
+  { path: '/bookings/', key: 'bookingDetail' },
   { path: '/bookings', key: 'bookings' },
   { path: '/finance', key: 'finance' },
   { path: '/users/new', key: 'newUser' },

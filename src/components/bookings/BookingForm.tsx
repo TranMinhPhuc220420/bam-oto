@@ -9,9 +9,10 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
-import { Button, DatePicker, Empty, Form, Input, InputNumber, Select, Steps, Tag, Typography } from 'antd'
+import { App, Button, DatePicker, Empty, Form, Input, InputNumber, Select, Spin, Steps, Tag, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
 
+import { useBookings } from '../../hooks/useBookings'
 import { useCars } from '../../hooks/useCars'
 import { useCustomers } from '../../hooks/useCustomers'
 import { getBookingAdjustmentItems, getBookingExtraChargeItems } from '../../services/bookingService'
@@ -22,6 +23,7 @@ import {
   BookingAdjustmentType,
   BookingExtraChargeItem,
   BookingExtraChargeType,
+  BookingReturnCarStatus,
   BookingStatus,
   PaymentMethod,
   PaymentStatus,
@@ -42,6 +44,7 @@ export interface BookingFormValues {
   pickupLocation: string
   returnLocation: string
   status: BookingStatus
+  carReturnStatus?: BookingReturnCarStatus
   totalPrice?: number
   rentalAmount?: number
   depositAmount?: number
@@ -64,21 +67,22 @@ export interface BookingFormValues {
 
 interface BookingFormProps {
   initialValues?: Partial<Booking>
-  onSubmit: (values: BookingFormValues) => void
+  onSubmit: (values: BookingFormValues) => Promise<void> | void
   onDocumentUrlsChange?: (urls: string[]) => Promise<void> | void
   isLoading?: boolean
 }
 
 const bookingStatuses: BookingStatus[] = ['draft', 'confirmed', 'in-progress', 'completed', 'canceled']
+const blockingBookingStatuses: BookingStatus[] = ['draft', 'confirmed', 'in-progress']
 const bookingProgressStages = ['draft', 'confirmed', 'in-progress', 'completed'] as const
+const carReturnStatuses: BookingReturnCarStatus[] = ['available', 'cleaning', 'repair']
 const paymentMethods: PaymentMethod[] = ['cash', 'bank-transfer', 'card', 'other']
 const chargeTypes: BookingExtraChargeType[] = ['fuel', 'late-fee', 'damage', 'cleaning', 'toll', 'other']
 const adjustmentTypes: BookingAdjustmentType[] = ['discount', 'refund', 'waiver', 'other']
-const paymentStatusColors: Record<PaymentStatus, string> = {
-  unpaid: 'gold',
-  partial: 'cyan',
-  paid: 'green',
-  refunded: 'volcano',
+
+type BookedRange = {
+  start: Dayjs
+  end: Dayjs
 }
 
 function toDayjs(value: unknown) {
@@ -132,6 +136,88 @@ function sumRowAmounts(items?: Array<{ amount?: number }>) {
   return (items ?? []).reduce((total, item) => total + (Number.isFinite(item?.amount) ? Number(item.amount) : 0), 0)
 }
 
+function isDateFullyBlocked(date: Dayjs, ranges: BookedRange[]) {
+  const dayStart = date.startOf('day')
+  const nextDayStart = dayStart.add(1, 'day')
+
+  return ranges.some((range) => dayStart.valueOf() >= range.start.valueOf() && nextDayStart.valueOf() <= range.end.valueOf())
+}
+
+function addMinuteWindow(minutesByHour: Map<number, Set<number>>, start: Dayjs, end: Dayjs) {
+  if (!end.isAfter(start)) {
+    return
+  }
+
+  const normalizedStart = start.startOf('minute')
+  const normalizedLastMinute = end.subtract(1, 'minute').startOf('minute')
+
+  if (normalizedLastMinute.valueOf() < normalizedStart.valueOf()) {
+    const minuteSet = minutesByHour.get(normalizedStart.hour()) ?? new Set<number>()
+    minuteSet.add(normalizedStart.minute())
+    minutesByHour.set(normalizedStart.hour(), minuteSet)
+    return
+  }
+
+  for (let hour = normalizedStart.hour(); hour <= normalizedLastMinute.hour(); hour += 1) {
+    const minuteSet = minutesByHour.get(hour) ?? new Set<number>()
+    const minMinute = hour === normalizedStart.hour() ? normalizedStart.minute() : 0
+    const maxMinute = hour === normalizedLastMinute.hour() ? normalizedLastMinute.minute() : 59
+
+    for (let minute = minMinute; minute <= maxMinute; minute += 1) {
+      minuteSet.add(minute)
+    }
+
+    minutesByHour.set(hour, minuteSet)
+  }
+}
+
+function buildDisabledTimeConfig(
+  current: Dayjs | null,
+  options: {
+    blockedRanges?: BookedRange[]
+    minDateTime?: Dayjs | null
+    maxDateTime?: Dayjs | null
+  } = {}
+) {
+  if (!current) {
+    return {}
+  }
+
+  const minutesByHour = new Map<number, Set<number>>()
+  const dayStart = current.startOf('day')
+  const nextDayStart = dayStart.add(1, 'day')
+
+  const applyWindow = (start: Dayjs, end: Dayjs) => {
+    const clampedStart = start.isAfter(dayStart) ? start : dayStart
+    const clampedEnd = end.isBefore(nextDayStart) ? end : nextDayStart
+
+    addMinuteWindow(minutesByHour, clampedStart, clampedEnd)
+  }
+
+  for (const range of options.blockedRanges ?? []) {
+    if (range.end.isAfter(dayStart) && range.start.isBefore(nextDayStart)) {
+      applyWindow(range.start, range.end)
+    }
+  }
+
+  if (options.minDateTime && current.isSame(options.minDateTime, 'day')) {
+    applyWindow(dayStart, options.minDateTime)
+  }
+
+  if (options.maxDateTime && current.isSame(options.maxDateTime, 'day')) {
+    applyWindow(options.maxDateTime, nextDayStart)
+  }
+
+  const disabledHours = Array.from({ length: 24 }, (_, hour) => hour).filter(
+    (hour) => (minutesByHour.get(hour)?.size ?? 0) >= 60
+  )
+
+  return {
+    disabledHours: () => disabledHours,
+    disabledMinutes: (hour: number) => Array.from(minutesByHour.get(hour) ?? []).sort((a, b) => a - b),
+  }
+}
+
 export function BookingForm({
   initialValues,
   onSubmit,
@@ -140,13 +226,21 @@ export function BookingForm({
 }: BookingFormProps) {
   const [form] = Form.useForm<BookingFormValues>()
   const { t, i18n } = useTranslation()
+  const { modal } = App.useApp()
+  const { bookings: activeBookings } = useBookings({ statuses: blockingBookingStatuses })
   const { cars, loading: carsLoading } = useCars()
   const { customers, loading: customersLoading } = useCustomers()
   const selectedCustomerId = Form.useWatch('customerId', form)
   const selectedCarId = Form.useWatch('carId', form)
+  const selectedStartDate = Form.useWatch('startDate', form) as Dayjs | undefined
+  const selectedEndDate = Form.useWatch('endDate', form) as Dayjs | undefined
+  const currentBooking = initialValues?.id ? (initialValues as Booking) : null
+  const isExistingBooking = Boolean(currentBooking?.id)
   const currentBookingStatus =
     (Form.useWatch('status', form) as BookingStatus | undefined) ?? initialValues?.status ?? 'draft'
-  const currentPaymentStatus = (Form.useWatch('paymentStatus', form) as PaymentStatus | undefined) ?? 'unpaid'
+  const isReadOnlyBooking = currentBooking?.status === 'completed' || currentBooking?.status === 'canceled'
+  const isIdentityLocked = isExistingBooking
+  const requiresCarReturnStatus = currentBookingStatus === 'completed' || currentBookingStatus === 'canceled'
   const rentalAmount = Number(Form.useWatch('rentalAmount', form) ?? 0)
   const depositAmount = Number(Form.useWatch('depositAmount', form) ?? 0)
   const paymentAmountThisTime = Number(Form.useWatch('paymentAmountThisTime', form) ?? 0)
@@ -173,6 +267,7 @@ export function BookingForm({
       pickupLocation: initialValues.pickupLocation,
       returnLocation: initialValues.returnLocation,
       status: initialValues.status,
+      carReturnStatus: initialValues.carReturnStatus,
       totalPrice: initialValues.totalPrice,
       rentalAmount: initialValues.rentalAmount ?? initialValues.totalPrice,
       depositAmount: initialValues.depositAmount,
@@ -218,7 +313,141 @@ export function BookingForm({
     })
   }, [customers, form, selectedCustomerId])
 
+  useEffect(() => {
+    const currentValue = form.getFieldValue('carReturnStatus') as BookingReturnCarStatus | undefined
+
+    if (currentBookingStatus === 'completed') {
+      if (!currentValue) {
+        form.setFieldValue('carReturnStatus', 'cleaning')
+      }
+
+      return
+    }
+
+    if (currentBookingStatus === 'canceled') {
+      if (!currentValue) {
+        form.setFieldValue('carReturnStatus', 'available')
+      }
+
+      return
+    }
+
+    if (currentValue !== undefined) {
+      form.setFieldValue('carReturnStatus', undefined)
+    }
+  }, [currentBookingStatus, form])
+
   const selectedCar = useMemo(() => cars.find((car) => car.id === selectedCarId), [cars, selectedCarId])
+  const blockedRanges = useMemo(() => {
+    if (!selectedCarId) {
+      return []
+    }
+
+    return activeBookings
+      .filter((booking) => booking.carId === selectedCarId && booking.id !== currentBooking?.id)
+      .map((booking) => {
+        const start = toDayjs(booking.startDate)
+        const end = toDayjs(booking.endDate)
+
+        if (!start || !end || !end.isAfter(start)) {
+          return null
+        }
+
+        return { start, end }
+      })
+      .filter((range): range is BookedRange => Boolean(range))
+      .sort((left, right) => left.start.valueOf() - right.start.valueOf())
+  }, [activeBookings, currentBooking?.id, selectedCarId])
+  const nextBlockedStartAfterSelectedStart = useMemo(() => {
+    if (!selectedStartDate) {
+      return null
+    }
+
+    return (
+      blockedRanges.find(
+        (range) => range.start.valueOf() >= selectedStartDate.valueOf() && range.end.valueOf() > selectedStartDate.valueOf()
+      )?.start ?? null
+    )
+  }, [blockedRanges, selectedStartDate])
+  const latestBlockedEndBeforeSelectedEnd = useMemo(() => {
+    if (!selectedEndDate) {
+      return null
+    }
+
+    return blockedRanges.reduce<Dayjs | null>((latest, range) => {
+      if (range.start.valueOf() >= selectedEndDate.valueOf() || range.end.valueOf() > selectedEndDate.valueOf()) {
+        return latest
+      }
+
+      if (!latest || range.end.valueOf() > latest.valueOf()) {
+        return range.end
+      }
+
+      return latest
+    }, null)
+  }, [blockedRanges, selectedEndDate])
+  const disableStartDate = (current: Dayjs) => {
+    if (!current) {
+      return false
+    }
+
+    if (current.endOf('day').isBefore(dayjs())) {
+      return true
+    }
+
+    if (selectedEndDate && current.startOf('day').isAfter(selectedEndDate.startOf('day'))) {
+      return true
+    }
+
+    return isDateFullyBlocked(current, blockedRanges)
+  }
+  const disableEndDate = (current: Dayjs) => {
+    if (!current) {
+      return false
+    }
+
+    if (current.endOf('day').isBefore(dayjs())) {
+      return true
+    }
+
+    if (selectedStartDate && current.endOf('day').isBefore(selectedStartDate)) {
+      return true
+    }
+
+    if (nextBlockedStartAfterSelectedStart && current.startOf('day').isAfter(nextBlockedStartAfterSelectedStart.startOf('day'))) {
+      return true
+    }
+
+    return isDateFullyBlocked(current, blockedRanges)
+  }
+  const disableStartTime = (current: Dayjs | null) => {
+    const nowBoundary = dayjs().add(1, 'minute')
+    const minDateTime =
+      latestBlockedEndBeforeSelectedEnd && latestBlockedEndBeforeSelectedEnd.isAfter(nowBoundary)
+        ? latestBlockedEndBeforeSelectedEnd
+        : nowBoundary
+
+    return buildDisabledTimeConfig(current, {
+      blockedRanges,
+      minDateTime,
+      maxDateTime: selectedEndDate ?? null,
+    })
+  }
+  const disableEndTime = (current: Dayjs | null) => {
+    const minDateTime = selectedStartDate ? selectedStartDate.add(1, 'minute') : dayjs().add(1, 'minute')
+
+    if (selectedStartDate) {
+      return buildDisabledTimeConfig(current, {
+        minDateTime,
+        maxDateTime: nextBlockedStartAfterSelectedStart ? nextBlockedStartAfterSelectedStart.add(1, 'minute') : null,
+      })
+    }
+
+    return buildDisabledTimeConfig(current, {
+      blockedRanges,
+      minDateTime,
+    })
+  }
   const extraCharges = useMemo(() => sumRowAmounts(extraChargeItems), [extraChargeItems])
   const discountAmount = useMemo(
     () => sumRowAmounts(adjustmentItems.filter((item) => item?.type !== 'refund')),
@@ -234,7 +463,6 @@ export function BookingForm({
   const cumulativePaidAmount = Math.max(basePaidAmount + paymentAmountThisTime, 0)
   const remainingAmount = Math.max(calculatedTotal - cumulativePaidAmount, 0)
   const depositGap = Math.max(depositAmount - cumulativePaidAmount, 0)
-  const currentBooking = initialValues?.id ? (initialValues as Booking) : null
   const hasTransactionHistory = Boolean(currentBooking?.id)
   const currentProgressStatus =
     (currentBookingStatus === 'canceled' ? 'draft' : currentBookingStatus) as (typeof bookingProgressStages)[number]
@@ -261,6 +489,43 @@ export function BookingForm({
       icon: <FlagOutlined />,
     },
   ]
+
+  const handleCarChange = (value: string) => {
+    const car = cars.find((entry) => entry.id === value)
+
+    if (!car) {
+      return
+    }
+
+    form.setFields([{ name: 'carId', errors: [] }])
+
+    if (isReadOnlyBooking || car.status !== 'cleaning') {
+      return
+    }
+
+    const previousCarId = selectedCarId && selectedCarId !== value ? selectedCarId : undefined
+
+    modal.confirm({
+      title: t('bookings.form.cleaningWarningTitle'),
+      content: t('bookings.form.cleaningWarningDescription', { plateNumber: car.plateNumber }),
+      okText: t('bookings.form.cleaningWarningConfirm'),
+      cancelText: t('bookings.form.cleaningWarningCancel'),
+      onCancel: () => {
+        form.setFieldValue('carId', previousCarId)
+      },
+    })
+  }
+
+  const handleFinish = (values: BookingFormValues) => {
+    const car = cars.find((entry) => entry.id === values.carId)
+
+    if (car?.status === 'repair') {
+      form.setFields([{ name: 'carId', errors: [t('bookings.form.validation.carRepairBlocked')] }])
+      return
+    }
+
+    return onSubmit(values)
+  }
 
   useEffect(() => {
     const nextFields = {
@@ -309,29 +574,31 @@ export function BookingForm({
   }, [calculatedTotal, cumulativePaidAmount, form, refundAmount, remainingAmount])
 
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={onSubmit}
-      initialValues={{
-        status: 'draft',
-        paymentStatus: 'unpaid',
-        paymentMethod: 'cash',
-        totalPrice: 0,
-        rentalAmount: 0,
-        depositAmount: 0,
-        securityDeposit: 0,
-        extraChargeItems: [],
-        adjustmentItems: [],
-        extraCharges: 0,
-        discountAmount: 0,
-        paidAmount: 0,
-        paymentAmountThisTime: 0,
-        refundAmount: 0,
-        pickupLocation: t('bookings.form.defaultLocation'),
-        returnLocation: t('bookings.form.defaultLocation'),
-      }}
-    >
+    <Spin spinning={isLoading} size="large" tip={t('bookings.form.submitting')}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleFinish}
+        disabled={isLoading || isReadOnlyBooking}
+        initialValues={{
+          status: 'draft',
+          paymentStatus: 'unpaid',
+          paymentMethod: 'cash',
+          totalPrice: 0,
+          rentalAmount: 0,
+          depositAmount: 0,
+          securityDeposit: 0,
+          extraChargeItems: [],
+          adjustmentItems: [],
+          extraCharges: 0,
+          discountAmount: 0,
+          paidAmount: 0,
+          paymentAmountThisTime: 0,
+          refundAmount: 0,
+          pickupLocation: t('bookings.form.defaultLocation'),
+          returnLocation: t('bookings.form.defaultLocation'),
+        }}
+      >
       <Form.Item name="paidAmount" hidden>
         <InputNumber />
       </Form.Item>
@@ -380,6 +647,12 @@ export function BookingForm({
         </div>
       </SectionCard>
 
+      {isExistingBooking ? (
+        <Typography.Paragraph className="!mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {isReadOnlyBooking ? t('bookings.form.readOnlyClosedHelper') : t('bookings.form.identityLockedHelper')}
+        </Typography.Paragraph>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Form.Item
           name="carId"
@@ -390,10 +663,12 @@ export function BookingForm({
             showSearch
             optionFilterProp="label"
             loading={carsLoading}
+            disabled={isIdentityLocked}
             placeholder={t('bookings.form.carPlaceholder')}
+            onChange={handleCarChange}
             options={cars.map((car) => ({
               value: car.id,
-              label: `${car.plateNumber} • ${[car.brand, car.model].filter(Boolean).join(' ')}`,
+              label: `${car.plateNumber} • ${[car.brand, car.model].filter(Boolean).join(' ')} • ${t(`cars.list.statusLabels.${car.status}`)}`,
               disabled: car.status === 'repair',
             }))}
           />
@@ -405,6 +680,7 @@ export function BookingForm({
             showSearch
             optionFilterProp="label"
             loading={customersLoading}
+            disabled={isIdentityLocked}
             placeholder={t('bookings.form.customerPlaceholder')}
             options={customers.map((customer) => ({
               value: customer.id,
@@ -415,13 +691,22 @@ export function BookingForm({
       </div>
 
       {selectedCar ? (
-        <Typography.Paragraph className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          {t('bookings.form.selectedCarHelper', {
-            plateNumber: selectedCar.plateNumber,
-            brand: selectedCar.brand,
-            model: selectedCar.model,
-          })}
-        </Typography.Paragraph>
+        <div className="space-y-3">
+          <Typography.Paragraph className="!mb-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {t('bookings.form.selectedCarHelper', {
+              plateNumber: selectedCar.plateNumber,
+              brand: selectedCar.brand,
+              model: selectedCar.model,
+              status: t(`cars.list.statusLabels.${selectedCar.status}`),
+            })}
+          </Typography.Paragraph>
+
+          {selectedCar.status === 'cleaning' && !isReadOnlyBooking ? (
+            <Typography.Paragraph className="!mb-0 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {t('bookings.form.selectedCarCleaningHelper')}
+            </Typography.Paragraph>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -430,7 +715,7 @@ export function BookingForm({
           label={t('bookings.form.customerName')}
           rules={[{ required: true, message: t('bookings.form.validation.customerName') }]}
         >
-          <Input placeholder={t('bookings.form.customerNamePlaceholder')} />
+          <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerNamePlaceholder')} />
         </Form.Item>
 
         <Form.Item
@@ -438,7 +723,7 @@ export function BookingForm({
           label={t('bookings.form.customerPhoneNumber')}
           rules={[{ required: true, message: t('bookings.form.validation.customerPhoneNumber') }]}
         >
-          <Input placeholder={t('bookings.form.customerPhoneNumberPlaceholder')} />
+          <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerPhoneNumberPlaceholder')} />
         </Form.Item>
 
         <Form.Item
@@ -446,7 +731,7 @@ export function BookingForm({
           label={t('bookings.form.customerEmail')}
           rules={[{ type: 'email', message: t('bookings.form.validation.customerEmail') }]}
         >
-          <Input placeholder={t('bookings.form.customerEmailPlaceholder')} />
+          <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerEmailPlaceholder')} />
         </Form.Item>
       </div>
 
@@ -456,7 +741,14 @@ export function BookingForm({
           label={t('bookings.form.startDate')}
           rules={[{ required: true, message: t('bookings.form.validation.startDate') }]}
         >
-          <DatePicker showTime className="w-full" format="DD/MM/YYYY HH:mm" />
+          <DatePicker
+            showTime={{ format: 'HH:mm' }}
+            className="w-full"
+            format="DD/MM/YYYY HH:mm"
+            disabled={isIdentityLocked}
+            disabledDate={disableStartDate}
+            disabledTime={disableStartTime}
+          />
         </Form.Item>
 
         <Form.Item
@@ -478,7 +770,13 @@ export function BookingForm({
             }),
           ]}
         >
-          <DatePicker showTime className="w-full" format="DD/MM/YYYY HH:mm" />
+          <DatePicker
+            showTime={{ format: 'HH:mm' }}
+            className="w-full"
+            format="DD/MM/YYYY HH:mm"
+            disabledDate={disableEndDate}
+            disabledTime={disableEndTime}
+          />
         </Form.Item>
       </div>
 
@@ -505,17 +803,36 @@ export function BookingForm({
           <Select options={bookingStatuses.map((status) => ({ value: status, label: t(`bookings.status.${status}`) }))} />
         </Form.Item>
 
+        {requiresCarReturnStatus ? (
+          <Form.Item
+            name="carReturnStatus"
+            label={t('bookings.form.carReturnStatus')}
+            help={t('bookings.form.carReturnStatusHelp')}
+            rules={[{ required: true, message: t('bookings.form.validation.carReturnStatus') }]}
+          >
+            <Select
+              placeholder={t('bookings.form.carReturnStatusPlaceholder')}
+              options={carReturnStatuses.map((status) => ({
+                value: status,
+                label: t(`cars.list.statusLabels.${status}`),
+              }))}
+            />
+          </Form.Item>
+        ) : null}
+      </div>
+
+      {/* <div className="grid gap-4 md:grid-cols-3">
         <Form.Item label={t('bookings.form.paymentStatus')}>
           <div className="flex min-h-8 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <Tag color={paymentStatusColors[currentPaymentStatus]} className="!mr-0 rounded-full px-3 py-1 font-medium">
               {t(`bookings.paymentStatus.${currentPaymentStatus}`)}
             </Tag>
-            <Typography.Text className="text-sm text-slate-500">
+            <Typography.Text sName="text-sm text-slate-500">
               {t('bookings.form.paymentStatusHelper')}
             </Typography.Text>
           </div>
         </Form.Item>
-      </div>
+      </div> */}
 
       <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
         <div>
@@ -630,16 +947,18 @@ export function BookingForm({
                   </Form.Item>
 
                   <div className="flex items-end">
-                    <Button danger icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
+                    <Button danger disabled={isReadOnlyBooking} icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
                       {t('common.actions.delete')}
                     </Button>
                   </div>
                 </div>
               ))}
 
-              <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createChargeRow())}>
-                {t('bookings.form.addSurcharge')}
-              </Button>
+              {!isReadOnlyBooking ? (
+                <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createChargeRow())}>
+                  {t('bookings.form.addSurcharge')}
+                </Button>
+              ) : null}
             </div>
           )}
         </Form.List>
@@ -704,16 +1023,18 @@ export function BookingForm({
                   </Form.Item>
 
                   <div className="flex items-end">
-                    <Button danger icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
+                    <Button danger disabled={isReadOnlyBooking} icon={<DeleteOutlined />} onClick={() => remove(field.name)}>
                       {t('common.actions.delete')}
                     </Button>
                   </div>
                 </div>
               ))}
 
-              <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createAdjustmentRow())}>
-                {t('bookings.form.addAdjustment')}
-              </Button>
+              {!isReadOnlyBooking ? (
+                <Button type="dashed" icon={<PlusOutlined />} onClick={() => add(createAdjustmentRow())}>
+                  {t('bookings.form.addAdjustment')}
+                </Button>
+              ) : null}
             </div>
           )}
         </Form.List>
@@ -848,7 +1169,7 @@ export function BookingForm({
       <SectionCard className="mt-6" title={t('bookings.form.documents')} description={t('bookings.upload.helper')}>
         <div className="p-4 sm:p-5">
           <Form.Item name="documentUrls" className="!mb-0">
-            <BookingDocumentUpload onPersistChange={onDocumentUrlsChange} />
+            <BookingDocumentUpload readOnly={isReadOnlyBooking} onPersistChange={isReadOnlyBooking ? undefined : onDocumentUrlsChange} />
           </Form.Item>
         </div>
       </SectionCard>
@@ -859,15 +1180,18 @@ export function BookingForm({
             <Input.TextArea rows={4} placeholder={t('bookings.form.notePlaceholder')} />
           </Form.Item>
 
-          <Form.Item className="!mb-0">
-            <div className="flex justify-end">
-              <Button type="primary" htmlType="submit" loading={isLoading}>
-                {initialValues ? t('bookings.form.submitUpdate') : t('bookings.form.submitCreate')}
-              </Button>
-            </div>
-          </Form.Item>
+          {!isReadOnlyBooking ? (
+            <Form.Item className="!mb-0">
+              <div className="flex justify-end">
+                <Button type="primary" htmlType="submit" loading={isLoading}>
+                  {initialValues ? t('bookings.form.submitUpdate') : t('bookings.form.submitCreate')}
+                </Button>
+              </div>
+            </Form.Item>
+          ) : null}
         </div>
       </SectionCard>
     </Form>
+    </Spin>
   )
 }

@@ -11,12 +11,14 @@ interface BookingDocumentUploadProps {
   value?: string[]
   onChange?: (urls: string[]) => void
   onPersistChange?: (urls: string[]) => Promise<void> | void
+  readOnly?: boolean
 }
 
 export function BookingDocumentUpload({
   value = [],
   onChange,
   onPersistChange,
+  readOnly = false,
 }: BookingDocumentUploadProps) {
   const { message } = App.useApp()
   const { t } = useTranslation()
@@ -86,20 +88,26 @@ export function BookingDocumentUpload({
           </Typography.Text>
         </div>
 
-        <Upload accept={FILE_TYPE_ACCEPT} multiple showUploadList={false} customRequest={customRequest} onChange={handleChange}>
-          <Button icon={value.length ? <PaperClipOutlined /> : <UploadOutlined />}>
-            {value.length ? t('bookings.upload.uploadMore') : t('bookings.upload.upload')}
-          </Button>
-        </Upload>
+        {!readOnly ? (
+          <Upload accept={FILE_TYPE_ACCEPT} multiple showUploadList={false} customRequest={customRequest} onChange={handleChange}>
+            <Button icon={value.length ? <PaperClipOutlined /> : <UploadOutlined />}>
+              {value.length ? t('bookings.upload.uploadMore') : t('bookings.upload.upload')}
+            </Button>
+          </Upload>
+        ) : null}
       </div>
 
       <BookingDocumentsPreview
         urls={value}
         emptyText={t('bookings.upload.previewEmpty')}
         removingUrl={removingUrl}
-        onRemove={(url) => {
-          void handleRemove(url)
-        }}
+        onRemove={
+          readOnly
+            ? undefined
+            : (url) => {
+                void handleRemove(url)
+              }
+        }
       />
     </div>
   )

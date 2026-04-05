@@ -2,12 +2,19 @@ import { Button, Empty, Popconfirm, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import { Car, CarStatus } from '../../types/Car'
+
+interface ActiveBookingSummary {
+  id: string
+  bookingCode: string
+}
 
 interface CarListProps {
   cars: Car[]
   isLoading: boolean
+  activeBookingByCarId?: Record<string, ActiveBookingSummary>
   onEdit: (car: Car) => void
   onDelete: (carId: string) => void
 }
@@ -21,10 +28,33 @@ const statusColors: Record<CarStatus, string> = {
   repair: 'red',
 }
 
-export function CarList({ cars, isLoading, onEdit, onDelete }: CarListProps) {
+export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, onDelete }: CarListProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
 
   const columns: ColumnsType<Car> = [
+    // Image
+    {
+      title: t('cars.list.image'),
+      key: 'image',
+      width: 100,
+      render: (_, record) => (
+        <div className="h-16 w-24 overflow-hidden rounded-lg bg-slate-100">
+          {record.images[0] ? (
+            <img
+              src={record.images[0]}
+              alt={record.plateNumber}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-slate-400">
+              {t('cars.list.noImage')}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    // Name & Brand
     {
       title: t('cars.list.vehicle'),
       key: 'vehicle',
@@ -70,6 +100,27 @@ export function CarList({ cars, isLoading, onEdit, onDelete }: CarListProps) {
       onFilter: (value, record) => record.status === value,
     },
     {
+      title: t('cars.list.currentBooking'),
+      key: 'currentBooking',
+      render: (_, record) => {
+        const activeBooking = record.id ? activeBookingByCarId[record.id] : undefined
+
+        if (record.status !== 'rented') {
+          return <Text className="text-slate-400">—</Text>
+        }
+
+        if (!activeBooking?.id) {
+          return <Text className="text-sm text-amber-700">{t('cars.list.noCurrentBooking')}</Text>
+        }
+
+        return (
+          <Button type="link" className="px-0" onClick={() => navigate(`/bookings/${activeBooking.id}`)}>
+            {activeBooking.bookingCode}
+          </Button>
+        )
+      },
+    },
+    {
       title: t('cars.list.actions'),
       key: 'action',
       align: 'right',
@@ -102,7 +153,7 @@ export function CarList({ cars, isLoading, onEdit, onDelete }: CarListProps) {
       rowKey="id"
       loading={isLoading}
       pagination={{ pageSize: 8, showSizeChanger: false, hideOnSinglePage: true }}
-      scroll={{ x: 760 }}
+      scroll={{ x: 920 }}
       locale={{
         emptyText: (
           <Empty

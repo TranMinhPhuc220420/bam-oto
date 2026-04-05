@@ -5,6 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import {
+  ensureUniqueCarPlateNumber,
+  isDuplicateCarPlateError,
+} from '../../services/carService';
 import { CarForm } from '../../components/cars/CarForm';
 import { Car } from '../../types/Car';
 
@@ -14,6 +18,7 @@ function buildCarPayload(values: Partial<Car>): Partial<Car> {
   return Object.fromEntries(
     Object.entries({
       ...values,
+      plateNumber: values.plateNumber?.trim().toUpperCase() || undefined,
       brand: values.brand?.trim() || undefined,
       model: values.model?.trim() || undefined,
       images: values.images ?? [],
@@ -58,6 +63,8 @@ export function EditCarPage() {
     if (!id) return;
     setLoading(true);
     try {
+      await ensureUniqueCarPlateNumber(values.plateNumber ?? car?.plateNumber ?? '', id);
+
       const docRef = doc(db, 'cars', id);
       await updateDoc(docRef, {
         ...buildCarPayload(values),
@@ -67,7 +74,11 @@ export function EditCarPage() {
       navigate('/cars');
     } catch (error) {
       console.error('Error updating car:', error);
-      message.error(t('cars.edit.error'));
+      message.error(
+        isDuplicateCarPlateError(error)
+          ? t('cars.form.validation.duplicatePlateNumber')
+          : t('cars.edit.error')
+      );
     } finally {
       setLoading(false);
     }

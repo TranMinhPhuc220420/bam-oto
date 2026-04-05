@@ -11,6 +11,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import { BookingsPage } from './pages/BookingsPage'
 import { CarsPage } from './pages/CarsPage'
+import { BookingDetailPage } from './pages/bookings/BookingDetailPage'
 import { EditBookingPage } from './pages/bookings/EditBookingPage'
 import { NewBookingPage } from './pages/bookings/NewBookingPage'
 import { EditCarPage } from './pages/cars/EditCarPage'
@@ -55,6 +56,7 @@ function AppRoutes() {
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/bookings/new" element={<NewBookingPage />} />
           <Route path="/bookings/edit/:id" element={<EditBookingPage />} />
+          <Route path="/bookings/:id" element={<BookingDetailPage />} />
           <Route element={<ProtectedRoute requireAdmin />}>
             <Route path="/cars/catalog" element={<CarCatalogPage />} />
             <Route path="/cars/brands" element={<Navigate to="/cars/catalog" replace />} />

@@ -5,6 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import {
+  ensureUniqueCarPlateNumber,
+  isDuplicateCarPlateError,
+} from '../../services/carService';
 import { CarForm } from '../../components/cars/CarForm';
 import { Car } from '../../types/Car';
 
@@ -14,6 +18,7 @@ function buildCarPayload(values: Partial<Car>): Partial<Car> {
   return Object.fromEntries(
     Object.entries({
       ...values,
+      plateNumber: values.plateNumber?.trim().toUpperCase() || undefined,
       brand: values.brand?.trim() || undefined,
       model: values.model?.trim() || undefined,
       images: values.images ?? [],
@@ -31,6 +36,8 @@ export function NewCarPage() {
   const handleSubmit = async (values: Partial<Car>) => {
     setLoading(true);
     try {
+      await ensureUniqueCarPlateNumber(values.plateNumber ?? '');
+
       const newCar: Partial<Car> = {
         ...buildCarPayload(values),
         everRented: false,
@@ -43,7 +50,11 @@ export function NewCarPage() {
       navigate('/cars');
     } catch (error) {
       console.error('Error adding car:', error);
-      message.error(t('cars.create.error'));
+      message.error(
+        isDuplicateCarPlateError(error)
+          ? t('cars.form.validation.duplicatePlateNumber')
+          : t('cars.create.error')
+      );
     } finally {
       setLoading(false);
     }

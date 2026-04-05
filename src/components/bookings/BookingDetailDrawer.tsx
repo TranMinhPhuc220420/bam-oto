@@ -130,13 +130,9 @@ function BreakdownSection({
   )
 }
 
-export function BookingDetailDrawer({ booking, open, onClose, onEdit }: BookingDetailDrawerProps) {
+export function BookingDetailContent({ booking }: { booking: Booking }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage?.startsWith('vi') ? 'vi-VN' : 'en-GB'
-
-  if (!booking) {
-    return <Drawer open={open} onClose={onClose} title={t('bookings.details.title')} size="large" />
-  }
 
   const startDate = toDate(booking.startDate)
   const endDate = toDate(booking.endDate)
@@ -222,231 +218,244 @@ export function BookingDetailDrawer({ booking, open, onClose, onEdit }: BookingD
   }))
 
   return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Typography.Title level={4} className="!mb-0 !text-slate-900">
+            {booking.bookingCode}
+          </Typography.Title>
+          <Tag color={statusColors[booking.status]} className="rounded-full px-3 py-1 font-medium">
+            {t(`bookings.status.${booking.status}`)}
+          </Tag>
+          <Tag color={paymentColors[booking.paymentStatus]} className="rounded-full px-3 py-1 font-medium">
+            {t(`bookings.paymentStatus.${booking.paymentStatus}`)}
+          </Tag>
+          {isOverdue ? <Tag color="red">{t('bookings.details.overdue')}</Tag> : null}
+        </div>
+
+        <Typography.Paragraph className="!mb-0 text-slate-600">
+          {startDate && endDate ? `${formatDateTime(startDate)} → ${formatDateTime(endDate)}` : t('bookings.details.noValue')}
+        </Typography.Paragraph>
+      </div>
+
+      <Descriptions
+        column={1}
+        size="small"
+        items={[
+          {
+            key: 'customer',
+            label: (
+              <Space>
+                <UserOutlined />
+                {t('bookings.details.customer')}
+              </Space>
+            ),
+            children: booking.customerSnapshot?.fullName ?? t('bookings.details.noValue'),
+          },
+          {
+            key: 'phone',
+            label: (
+              <Space>
+                <PhoneOutlined />
+                {t('bookings.details.phone')}
+              </Space>
+            ),
+            children: booking.customerSnapshot?.phoneNumber ?? t('bookings.details.noValue'),
+          },
+          {
+            key: 'car',
+            label: (
+              <Space>
+                <CarOutlined />
+                {t('bookings.details.car')}
+              </Space>
+            ),
+            children: [booking.carSnapshot?.plateNumber, booking.carSnapshot?.brand, booking.carSnapshot?.model]
+              .filter(Boolean)
+              .join(' • '),
+          },
+          {
+            key: 'duration',
+            label: (
+              <Space>
+                <ClockCircleOutlined />
+                {t('bookings.details.duration')}
+              </Space>
+            ),
+            children: durationDays ? t('bookings.details.durationDays', { count: durationDays }) : t('bookings.details.noValue'),
+          },
+          {
+            key: 'pickup',
+            label: (
+              <Space>
+                <EnvironmentOutlined />
+                {t('bookings.details.pickupLocation')}
+              </Space>
+            ),
+            children: booking.pickupLocation || t('bookings.details.noValue'),
+          },
+          {
+            key: 'return',
+            label: (
+              <Space>
+                <EnvironmentOutlined />
+                {t('bookings.details.returnLocation')}
+              </Space>
+            ),
+            children: booking.returnLocation || t('bookings.details.noValue'),
+          },
+          {
+            key: 'paymentMethod',
+            label: (
+              <Space>
+                <BankOutlined />
+                {t('bookings.details.paymentMethod')}
+              </Space>
+            ),
+            children: t(`bookings.methods.${booking.paymentMethod ?? 'other'}`),
+          },
+          {
+            key: 'timeline',
+            label: (
+              <Space>
+                <CalendarOutlined />
+                {t('bookings.details.timeline')}
+              </Space>
+            ),
+            children: `${formatDateTime(createdAt)} • ${t('bookings.details.updatedAt')}: ${formatDateTime(updatedAt)}`,
+          },
+        ]}
+      />
+
+      <div className="mb-5"></div>
+
+
+      <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
+        <Typography.Text className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          {t('bookings.details.paymentSummary')}
+        </Typography.Text>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.fixedTotal')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.fixedTotal)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.surchargeTotal')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.extraChargesTotal)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.adjustmentTotal')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-rose-600">{formatCurrency(financials.discountRefundTotal)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.total')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.totalPrice)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.details.paidAmount')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(financials.paidAmount)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.details.remainingAmount')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-amber-700">{formatCurrency(financials.remainingAmount)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.details.refundAmount')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.refundAmount)}</div>
+          </div>
+          <div>
+            <Typography.Text className="text-xs text-slate-500">{t('bookings.details.securityDeposit')}</Typography.Text>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.securityDeposit)}</div>
+          </div>
+        </div>
+      </div>
+
+      <BreakdownSection
+        title={t('bookings.details.fixedCharges')}
+        items={fixedRows}
+        locale={locale}
+        emptyText={t('bookings.details.lineItemsEmpty')}
+        labels={{
+          label: t('bookings.details.label'),
+          type: t('bookings.details.type'),
+          amount: t('bookings.details.amount'),
+        }}
+      />
+
+      <BreakdownSection
+        title={t('bookings.details.surcharges')}
+        items={surchargeRows}
+        locale={locale}
+        emptyText={t('bookings.details.lineItemsEmpty')}
+        labels={{
+          label: t('bookings.details.label'),
+          type: t('bookings.details.type'),
+          amount: t('bookings.details.amount'),
+        }}
+      />
+
+      <BreakdownSection
+        title={t('bookings.details.adjustments')}
+        items={adjustmentRows}
+        locale={locale}
+        emptyText={t('bookings.details.lineItemsEmpty')}
+        labels={{
+          label: t('bookings.details.label'),
+          type: t('bookings.details.type'),
+          amount: t('bookings.details.amount'),
+        }}
+      />
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-slate-900">
+          <BankOutlined />
+          <Typography.Title level={5} className="!mb-0">
+            {t('bookings.transactions.title')}
+          </Typography.Title>
+        </div>
+        <BookingTransactionList booking={booking} />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-slate-900">
+          <FileTextOutlined />
+          <Typography.Title level={5} className="!mb-0">
+            {t('bookings.details.documents')}
+          </Typography.Title>
+        </div>
+        <BookingDocumentsPreview urls={documentUrls} emptyText={t('bookings.upload.previewEmpty')} />
+      </div>
+
+      <div className="space-y-2">
+        <Typography.Title level={5} className="!mb-0 text-slate-900">
+          {t('bookings.details.note')}
+        </Typography.Title>
+        <Typography.Paragraph className="!mb-0 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-slate-600">
+          {booking.note?.trim() || t('bookings.details.noNote')}
+        </Typography.Paragraph>
+      </div>
+    </div>
+  )
+}
+
+export function BookingDetailDrawer({ booking, open, onClose, onEdit }: BookingDetailDrawerProps) {
+  const { t } = useTranslation()
+
+  return (
     <Drawer
       open={open}
       onClose={onClose}
       title={t('bookings.details.title')}
       size="large"
       extra={
-        <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(booking)}>
-          {t('common.actions.edit')}
-        </Button>
+        booking ? (
+          <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(booking)}>
+            {t('common.actions.edit')}
+          </Button>
+        ) : null
       }
     >
-      <div className="space-y-6">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Typography.Title level={4} className="!mb-0 !text-slate-900">
-              {booking.bookingCode}
-            </Typography.Title>
-            <Tag color={statusColors[booking.status]} className="rounded-full px-3 py-1 font-medium">
-              {t(`bookings.status.${booking.status}`)}
-            </Tag>
-            <Tag color={paymentColors[booking.paymentStatus]} className="rounded-full px-3 py-1 font-medium">
-              {t(`bookings.paymentStatus.${booking.paymentStatus}`)}
-            </Tag>
-            {isOverdue ? <Tag color="red">{t('bookings.details.overdue')}</Tag> : null}
-          </div>
-
-          <Typography.Paragraph className="!mb-0 text-slate-600">
-            {startDate && endDate ? `${formatDateTime(startDate)} → ${formatDateTime(endDate)}` : t('bookings.details.noValue')}
-          </Typography.Paragraph>
-        </div>
-
-        <Descriptions
-          column={1}
-          size="small"
-          items={[
-            {
-              key: 'customer',
-              label: (
-                <Space>
-                  <UserOutlined />
-                  {t('bookings.details.customer')}
-                </Space>
-              ),
-              children: booking.customerSnapshot?.fullName ?? t('bookings.details.noValue'),
-            },
-            {
-              key: 'phone',
-              label: (
-                <Space>
-                  <PhoneOutlined />
-                  {t('bookings.details.phone')}
-                </Space>
-              ),
-              children: booking.customerSnapshot?.phoneNumber ?? t('bookings.details.noValue'),
-            },
-            {
-              key: 'car',
-              label: (
-                <Space>
-                  <CarOutlined />
-                  {t('bookings.details.car')}
-                </Space>
-              ),
-              children: [booking.carSnapshot?.plateNumber, booking.carSnapshot?.brand, booking.carSnapshot?.model]
-                .filter(Boolean)
-                .join(' • '),
-            },
-            {
-              key: 'duration',
-              label: (
-                <Space>
-                  <ClockCircleOutlined />
-                  {t('bookings.details.duration')}
-                </Space>
-              ),
-              children: durationDays ? t('bookings.details.durationDays', { count: durationDays }) : t('bookings.details.noValue'),
-            },
-            {
-              key: 'pickup',
-              label: (
-                <Space>
-                  <EnvironmentOutlined />
-                  {t('bookings.details.pickupLocation')}
-                </Space>
-              ),
-              children: booking.pickupLocation || t('bookings.details.noValue'),
-            },
-            {
-              key: 'return',
-              label: (
-                <Space>
-                  <EnvironmentOutlined />
-                  {t('bookings.details.returnLocation')}
-                </Space>
-              ),
-              children: booking.returnLocation || t('bookings.details.noValue'),
-            },
-            {
-              key: 'paymentMethod',
-              label: (
-                <Space>
-                  <BankOutlined />
-                  {t('bookings.details.paymentMethod')}
-                </Space>
-              ),
-              children: t(`bookings.methods.${booking.paymentMethod ?? 'other'}`),
-            },
-            {
-              key: 'timeline',
-              label: (
-                <Space>
-                  <CalendarOutlined />
-                  {t('bookings.details.timeline')}
-                </Space>
-              ),
-              children: `${formatDateTime(createdAt)} • ${t('bookings.details.updatedAt')}: ${formatDateTime(updatedAt)}`,
-            },
-          ]}
-        />
-
-        <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
-          <Typography.Text className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            {t('bookings.details.paymentSummary')}
-          </Typography.Text>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.fixedTotal')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.fixedTotal)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.surchargeTotal')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.extraChargesTotal)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.adjustmentTotal')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-rose-600">{formatCurrency(financials.discountRefundTotal)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.total')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.totalPrice)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.details.paidAmount')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(financials.paidAmount)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.details.remainingAmount')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-amber-700">{formatCurrency(financials.remainingAmount)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.details.refundAmount')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.refundAmount)}</div>
-            </div>
-            <div>
-              <Typography.Text className="text-xs text-slate-500">{t('bookings.details.securityDeposit')}</Typography.Text>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.securityDeposit)}</div>
-            </div>
-          </div>
-        </div>
-
-        <BreakdownSection
-          title={t('bookings.details.fixedCharges')}
-          items={fixedRows}
-          locale={locale}
-          emptyText={t('bookings.details.lineItemsEmpty')}
-          labels={{
-            label: t('bookings.details.label'),
-            type: t('bookings.details.type'),
-            amount: t('bookings.details.amount'),
-          }}
-        />
-
-        <BreakdownSection
-          title={t('bookings.details.surcharges')}
-          items={surchargeRows}
-          locale={locale}
-          emptyText={t('bookings.details.lineItemsEmpty')}
-          labels={{
-            label: t('bookings.details.label'),
-            type: t('bookings.details.type'),
-            amount: t('bookings.details.amount'),
-          }}
-        />
-
-        <BreakdownSection
-          title={t('bookings.details.adjustments')}
-          items={adjustmentRows}
-          locale={locale}
-          emptyText={t('bookings.details.lineItemsEmpty')}
-          labels={{
-            label: t('bookings.details.label'),
-            type: t('bookings.details.type'),
-            amount: t('bookings.details.amount'),
-          }}
-        />
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-slate-900">
-            <BankOutlined />
-            <Typography.Title level={5} className="!mb-0">
-              {t('bookings.transactions.title')}
-            </Typography.Title>
-          </div>
-          <BookingTransactionList booking={booking} />
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-slate-900">
-            <FileTextOutlined />
-            <Typography.Title level={5} className="!mb-0">
-              {t('bookings.details.documents')}
-            </Typography.Title>
-          </div>
-          <BookingDocumentsPreview urls={documentUrls} emptyText={t('bookings.upload.previewEmpty')} />
-        </div>
-
-        <div className="space-y-2">
-          <Typography.Title level={5} className="!mb-0 text-slate-900">
-            {t('bookings.details.note')}
-          </Typography.Title>
-          <Typography.Paragraph className="!mb-0 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-slate-600">
-            {booking.note?.trim() || t('bookings.details.noNote')}
-          </Typography.Paragraph>
-        </div>
-      </div>
+      {booking ? <BookingDetailContent booking={booking} /> : null}
     </Drawer>
   )
 }

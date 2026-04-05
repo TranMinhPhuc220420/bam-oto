@@ -13,6 +13,7 @@ import { collection, deleteDoc, doc, onSnapshot, query } from 'firebase/firestor
 import { CarList } from '../components/cars/CarList'
 import { MetricCard } from '../components/ui/MetricCard'
 import { SectionCard } from '../components/ui/SectionCard'
+import { useBookings } from '../hooks/useBookings'
 import { db } from '../services/firebase'
 import { Car } from '../types/Car'
 
@@ -22,6 +23,7 @@ export function CarsPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { message } = App.useApp()
+  const { bookings: activeBookings, loading: activeBookingsLoading } = useBookings({ statuses: ['in-progress'] })
 
   useEffect(() => {
     const carsQuery = query(collection(db, 'cars'))
@@ -54,6 +56,21 @@ export function CarsPage() {
   const inServiceCount = useMemo(
     () => cars.filter((car) => car.status === 'repair' || car.status === 'cleaning').length,
     [cars]
+  )
+
+  const activeBookingByCarId = useMemo(
+    () =>
+      activeBookings.reduce<Record<string, { id: string; bookingCode: string }>>((accumulator, booking) => {
+        if (booking.carId && booking.id && !accumulator[booking.carId]) {
+          accumulator[booking.carId] = {
+            id: booking.id,
+            bookingCode: booking.bookingCode,
+          }
+        }
+
+        return accumulator
+      }, {}),
+    [activeBookings]
   )
 
   const handleEdit = (car: Car) => {
@@ -132,7 +149,8 @@ export function CarsPage() {
       >
         <CarList
           cars={cars}
-          isLoading={loading}
+          isLoading={loading || activeBookingsLoading}
+          activeBookingByCarId={activeBookingByCarId}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

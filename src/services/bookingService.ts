@@ -8,6 +8,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 
@@ -19,6 +20,7 @@ import {
   BookingCarSnapshot,
   BookingCustomerSnapshot,
   BookingExtraChargeItem,
+  BookingReturnCarStatus,
   BookingStatus,
   PaymentMethod,
   PaymentStatus,
@@ -41,6 +43,7 @@ export interface BookingFormPayload {
   pickupLocation: string
   returnLocation: string
   status: BookingStatus
+  carReturnStatus?: BookingReturnCarStatus
   totalPrice?: number
   rentalAmount?: number
   depositAmount?: number
@@ -58,7 +61,9 @@ export interface BookingFormPayload {
   note?: string
 }
 
-const blockingStatuses = new Set<BookingStatus>(['draft', 'confirmed', 'in-progress'])
+const overlapBlockingStatuses = new Set<BookingStatus>(['draft', 'confirmed', 'in-progress'])
+const activeRentalStatuses = new Set<BookingStatus>(['in-progress'])
+const closingBookingStatuses = new Set<BookingStatus>(['completed', 'canceled'])
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value) || value instanceof Date) {
@@ -360,6 +365,7 @@ export async function deleteBookingWithGuards(
 
   await Promise.all(transactionsSnapshot.docs.map((transactionDoc) => deleteDoc(transactionDoc.ref)))
   await deleteDoc(doc(db, 'bookings', booking.id))
+  await syncCarStatusWithBookings(booking.carId)
 
   return { allowed: true }
 }
@@ -391,12 +397,49 @@ function buildBookingCode() {
   return `BK-${datePart}-${randomPart}`
 }
 
-function buildCarSnapshot(car: Car): BookingCarSnapshot {
+function getClosingCarStatus(
+  bookingStatus: BookingStatus,
+  carReturnStatus?: BookingReturnCarStatus
+): BookingReturnCarStatus | undefined {
+  if (!closingBookingStatuses.has(bookingStatus)) {
+    return undefined
+  }
+
+  if (carReturnStatus) {
+    return carReturnStatus
+  }
+
+  return bookingStatus === 'completed' ? 'cleaning' : 'available'
+}
+
+function resolveCarStatusFromBookingState(
+  currentStatus: Car['status'],
+  options: {
+    hasActiveRental: boolean
+    fallbackStatus?: BookingReturnCarStatus
+  }
+): Car['status'] {
+  if (options.hasActiveRental) {
+    return 'rented'
+  }
+
+  if (options.fallbackStatus) {
+    return options.fallbackStatus
+  }
+
+  if (currentStatus === 'repair' || currentStatus === 'cleaning') {
+    return currentStatus
+  }
+
+  return 'available'
+}
+
+function buildCarSnapshot(car: Car, statusOverride?: Car['status']): BookingCarSnapshot {
   return stripUndefinedFields({
     plateNumber: car.plateNumber,
     brand: car.brand,
     model: car.model,
-    status: car.status,
+    status: statusOverride ?? car.status,
   }) as BookingCarSnapshot
 }
 
@@ -404,7 +447,7 @@ export function isBookingTransitionAllowed(currentStatus: BookingStatus, nextSta
   const allowedTransitions: Record<BookingStatus, BookingStatus[]> = {
     draft: ['draft', 'confirmed', 'canceled'],
     confirmed: ['confirmed', 'in-progress', 'canceled'],
-    'in-progress': ['in-progress', 'completed'],
+    'in-progress': ['in-progress', 'completed', 'canceled'],
     completed: ['completed'],
     canceled: ['canceled'],
   }
@@ -473,7 +516,7 @@ export async function isCarAvailable(
 
     const booking = bookingDoc.data() as Partial<Booking>
 
-    if (!booking.status || !blockingStatuses.has(booking.status)) {
+    if (!booking.status || !overlapBlockingStatuses.has(booking.status)) {
       return false
     }
 
@@ -485,6 +528,43 @@ export async function isCarAvailable(
     }
 
     return startDate < existingEnd && endDate > existingStart
+  })
+}
+
+export async function syncCarStatusWithBookings(
+  carId: string,
+  options?: { fallbackStatus?: BookingReturnCarStatus }
+) {
+  const car = await getCarById(carId)
+
+  if (!car?.id) {
+    return
+  }
+
+  const existingBookings = await getDocs(query(collection(db, 'bookings'), where('carId', '==', carId)))
+  const relatedBookings = existingBookings.docs.map((bookingDoc) => bookingDoc.data() as Partial<Booking>)
+  const hasActiveRental = relatedBookings.some((booking) => {
+    const status = booking.status
+
+    return typeof status === 'string' && activeRentalStatuses.has(status as BookingStatus)
+  })
+  const hasRentalHistory = relatedBookings.some(
+    (booking) => booking.status === 'confirmed' || booking.status === 'in-progress' || booking.status === 'completed'
+  )
+  const nextStatus = resolveCarStatusFromBookingState(car.status, {
+    hasActiveRental,
+    fallbackStatus: options?.fallbackStatus,
+  })
+  const nextEverRented = Boolean(car.everRented) || hasRentalHistory
+
+  if (car.status === nextStatus && Boolean(car.everRented) === nextEverRented) {
+    return
+  }
+
+  await updateDoc(doc(db, 'cars', carId), {
+    status: nextStatus,
+    everRented: nextEverRented,
+    updatedAt: serverTimestamp(),
   })
 }
 
@@ -506,6 +586,8 @@ export async function prepareBookingPayload(
     .filter(Boolean)
   const financials = calculateBookingFinancials(values)
 
+  const closingCarStatus = getClosingCarStatus(values.status, values.carReturnStatus)
+
   return stripUndefinedFields({
     bookingCode: existingBookingCode ?? values.bookingCode ?? buildBookingCode(),
     carId: values.carId,
@@ -515,6 +597,7 @@ export async function prepareBookingPayload(
     pickupLocation: values.pickupLocation.trim(),
     returnLocation: values.returnLocation.trim(),
     status: values.status,
+    carReturnStatus: closingCarStatus ?? (options?.forUpdate ? deleteField() : undefined),
     totalPrice: financials.totalPrice,
     fixedTotal: financials.fixedTotal,
     rentalAmount: financials.rentalAmount,
@@ -534,7 +617,13 @@ export async function prepareBookingPayload(
     documentUrls: documentUrls.length ? documentUrls : options?.forUpdate ? deleteField() : undefined,
     documentUrl: documentUrls[0] ?? (options?.forUpdate ? deleteField() : undefined),
     note: values.note?.trim() || undefined,
-    carSnapshot: buildCarSnapshot(car),
+    carSnapshot: buildCarSnapshot(
+      car,
+      resolveCarStatusFromBookingState(car.status, {
+        hasActiveRental: activeRentalStatuses.has(values.status),
+        fallbackStatus: closingCarStatus,
+      })
+    ),
     customerSnapshot,
   })
 }

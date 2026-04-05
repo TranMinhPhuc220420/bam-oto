@@ -9,6 +9,7 @@ import { Booking, BookingStatus, PaymentStatus } from '../../types/Booking'
 import type { UserRole } from '../../types/User'
 import { formatCurrencyVnd } from '../../utils/currency'
 import { BookingDocumentsPreview } from './BookingDocumentsPreview'
+import { useNavigate } from 'react-router-dom'
 
 interface BookingListProps {
   bookings: Booking[]
@@ -75,6 +76,7 @@ export function BookingList({
   currentUserRole,
   deletingBookingId,
 }: BookingListProps) {
+  const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage?.startsWith('vi') ? 'vi-VN' : 'en-GB'
 
@@ -85,7 +87,16 @@ export function BookingList({
       sorter: (a, b) => a.bookingCode.localeCompare(b.bookingCode),
       render: (_, record) => (
         <div className="space-y-1">
-          <Text strong className="text-slate-900">
+          {/* <Text strong className="text-slate-900">
+            {record.bookingCode}
+          </Text> */}
+          {/* <Button type="link" className="px-0" onClick={() => navigate(`/bookings/${record.id}`)}>
+            {record.bookingCode}
+          </Button> */}
+          {/* Link to page detail*/}
+          <Text strong className="text-slate-900 cursor-pointer"
+            onClick={() => navigate(`/bookings/${record.id}`)}
+          >
             {record.bookingCode}
           </Text>
           <div className="text-sm text-slate-500">{record.customerSnapshot?.fullName}</div>
@@ -121,23 +132,23 @@ export function BookingList({
             <div>
               {startDate
                 ? new Intl.DateTimeFormat(locale, {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }).format(startDate)
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(startDate)
                 : '—'}
             </div>
             <div className="text-slate-400">
               {endDate
                 ? new Intl.DateTimeFormat(locale, {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }).format(endDate)
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(endDate)
                 : '—'}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -230,10 +241,10 @@ export function BookingList({
         return (
           <Space size="small">
             <Button icon={<EyeOutlined />} onClick={() => onView(record)}>
-              {t('common.actions.view')}
+              {/* {t('common.actions.view')} */}
             </Button>
             <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
-              {t('common.actions.edit')}
+              {/* {t('common.actions.edit')} */}
             </Button>
             {currentUserRole === 'admin' ? (
               deleteState.allowed ? (
@@ -245,14 +256,14 @@ export function BookingList({
                   cancelText={t('common.actions.cancel')}
                 >
                   <Button icon={<DeleteOutlined />} danger loading={deletingBookingId === record.id}>
-                    {t('common.actions.delete')}
+                    {/* {t('common.actions.delete')} */}
                   </Button>
                 </Popconfirm>
               ) : (
                 <Tooltip title={t(deleteState.reasonKey ?? 'bookings.delete.blockedUnavailable')}>
                   <span>
                     <Button icon={<DeleteOutlined />} danger disabled>
-                      {t('common.actions.delete')}
+                      {/* {t('common.actions.delete')} */}
                     </Button>
                   </span>
                 </Tooltip>

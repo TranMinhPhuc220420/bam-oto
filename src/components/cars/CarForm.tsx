@@ -8,7 +8,9 @@ import { CarImageUpload } from './CarImageUpload';
 import { BrandSelector } from './BrandSelector';
 import { ModelSelector } from './ModelSelector';
 import { useCarBrands } from '../../hooks/useCarBrands';
+import { useCars } from '../../hooks/useCars';
 import { isCatalogDuplicateError, saveCarBrand, saveCarModel } from '../../services/carCatalog';
+import { normalizeCarPlateNumber } from '../../services/carService';
 import { Car } from '../../types/Car';
 import { CarBrand } from '../../types/Brand';
 import { CarModel } from '../../types/Model';
@@ -24,6 +26,7 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
   const { t } = useTranslation();
   const { message } = App.useApp();
   const { brands } = useCarBrands({ includeInactive: true });
+  const { cars } = useCars();
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [catalogSaving, setCatalogSaving] = useState(false);
@@ -31,6 +34,10 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
   const selectedBrandName = useMemo(
     () => brands.find((brand) => brand.id === selectedBrandId)?.name,
     [brands, selectedBrandId]
+  );
+  const initialNormalizedPlateNumber = useMemo(
+    () => normalizeCarPlateNumber(initialValues?.plateNumber),
+    [initialValues?.plateNumber]
   );
 
   useEffect(() => {
@@ -116,7 +123,11 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
   };
 
   const onFinish = (values: Partial<Car>) => {
-    onSubmit(values);
+    onSubmit({
+      ...values,
+      plateNumber:
+        typeof values.plateNumber === 'string' ? values.plateNumber.trim().toUpperCase() : values.plateNumber,
+    });
   };
 
   const brandExtra = (
@@ -164,7 +175,32 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
         <Form.Item
           name="plateNumber"
           label={t('cars.form.plateNumber')}
-          rules={[{ required: true, message: t('cars.form.validation.plateNumber') }]}
+          rules={[
+            { required: true, message: t('cars.form.validation.plateNumber') },
+            {
+              validator: async (_, value: string | undefined) => {
+                const normalizedValue = normalizeCarPlateNumber(value);
+
+                if (!normalizedValue || normalizedValue === initialNormalizedPlateNumber) {
+                  return Promise.resolve();
+                }
+
+                const hasDuplicate = cars.some((car) => {
+                  if (car.id === initialValues?.id) {
+                    return false;
+                  }
+
+                  return normalizeCarPlateNumber(car.plateNumber) === normalizedValue;
+                });
+
+                if (hasDuplicate) {
+                  return Promise.reject(new Error(t('cars.form.validation.duplicatePlateNumber')));
+                }
+
+                return Promise.resolve();
+              },
+            },
+          ]}
         >
           <Input disabled={initialValues?.everRented} placeholder={t('cars.form.plateNumberPlaceholder')} />
         </Form.Item>

@@ -12,6 +12,7 @@ import {
   isCarAvailable,
   prepareBookingPayload,
   syncBookingTransaction,
+  syncCarStatusWithBookings,
 } from '../../services/bookingService'
 
 const { Title } = Typography
@@ -63,6 +64,10 @@ export function NewBookingPage() {
         paymentStatus: bookingPayload.paymentStatus,
         paymentMethod: bookingPayload.paymentMethod,
         paymentNote: values.paymentNote,
+      })
+
+      await syncCarStatusWithBookings(bookingPayload.carId, {
+        fallbackStatus: values.status === 'completed' || values.status === 'canceled' ? values.carReturnStatus : undefined,
       })
 
       message.success(t('bookings.create.success'))

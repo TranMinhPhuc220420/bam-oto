@@ -12,6 +12,7 @@ import {
   isCarAvailable,
   prepareBookingPayload,
   syncBookingTransaction,
+  syncCarStatusWithBookings,
 } from '../../services/bookingService'
 import { db } from '../../services/firebase'
 import { Booking } from '../../types/Booking'
@@ -55,7 +56,7 @@ export function EditBookingPage() {
   }, [id, message, navigate, t])
 
   const handleDocumentUrlsChange = async (documentUrls: string[]) => {
-    if (!id) {
+    if (!id || booking?.status === 'completed' || booking?.status === 'canceled') {
       return
     }
 
@@ -84,6 +85,11 @@ export function EditBookingPage() {
     setLoading(true)
 
     try {
+      if (booking.status === 'completed' || booking.status === 'canceled') {
+        message.error(t('bookings.messages.closedReadOnly'))
+        return
+      }
+
       if (!isBookingTransitionAllowed(booking.status, values.status)) {
         message.error(t('bookings.messages.invalidTransition'))
         return
@@ -133,6 +139,18 @@ export function EditBookingPage() {
           paymentNote: values.paymentNote,
         },
         booking
+      )
+
+      const affectedCarIds = Array.from(new Set([booking.carId, bookingPayload.carId].filter(Boolean)))
+      await Promise.all(
+        affectedCarIds.map((carId) =>
+          syncCarStatusWithBookings(carId, {
+            fallbackStatus:
+              carId === bookingPayload.carId && (values.status === 'completed' || values.status === 'canceled')
+                ? values.carReturnStatus
+                : undefined,
+          })
+        )
       )
 
       message.success(t('bookings.edit.success'))

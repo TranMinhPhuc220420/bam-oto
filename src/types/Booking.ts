@@ -7,6 +7,7 @@ export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'refunded'
 export type PaymentMethod = 'cash' | 'bank-transfer' | 'card' | 'other'
 export type BookingExtraChargeType = 'fuel' | 'late-fee' | 'damage' | 'cleaning' | 'toll' | 'other'
 export type BookingAdjustmentType = 'discount' | 'refund' | 'waiver' | 'other'
+export type BookingReturnCarStatus = Exclude<CarStatus, 'rented'>
 
 export interface BookingCarSnapshot {
   plateNumber: string
@@ -51,6 +52,7 @@ export interface Booking {
   pickupLocation: string
   returnLocation: string
   status: BookingStatus
+  carReturnStatus?: BookingReturnCarStatus
   totalPrice: number
   fixedTotal?: number
   rentalAmount?: number
