@@ -1,0 +1,40 @@
+name: Build and Deploy to CPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code, set up Node.js, install dependencies, build the project, and deploy via FTP
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js, install dependencies, and build the project
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-node-version: '20'
+          cache: 'npm'
+
+      # Install dependencies and build the project
+      - name: Install dependencies and Build
+        run: |
+          npm install
+          npm run build
+
+      # Deploy to CPanel using FTP
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ./
+          protocol: ftp
+          port: 21
