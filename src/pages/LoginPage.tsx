@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Button, Form, Input, Typography, message } from 'antd'
+import { Alert, Button, Form, Input, Typography, Grid, message } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
@@ -23,12 +23,12 @@ export function LoginPage() {
 
   const fromPath =
     typeof location.state === 'object' &&
-    location.state !== null &&
-    'from' in location.state &&
-    typeof location.state.from === 'object' &&
-    location.state.from !== null &&
-    'pathname' in location.state.from &&
-    typeof location.state.from.pathname === 'string'
+      location.state !== null &&
+      'from' in location.state &&
+      typeof location.state.from === 'object' &&
+      location.state.from !== null &&
+      'pathname' in location.state.from &&
+      typeof location.state.from.pathname === 'string'
       ? location.state.from.pathname
       : '/cars'
 
@@ -56,13 +56,14 @@ export function LoginPage() {
         title={t('auth.login.title')}
         subtitle={t('auth.login.subtitle')}
       >
-        <Alert
+        {/* <Alert
           className="mb-6 rounded-2xl"
           type="info"
           showIcon
           message={t('auth.login.info')}
-        />
-        <Form form={form} layout="vertical" onFinish={handleSubmit} size="large">
+        /> */}
+
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             label={t('auth.login.email')}
             name="email"
@@ -87,11 +88,11 @@ export function LoginPage() {
           </Button>
         </Form>
 
-        <div className="mt-6 flex items-center justify-between gap-4 text-sm text-slate-600">
+        <div className="mt-6 text-sm text-slate-600 text-center">
           <Link to="/forgot-password">{t('auth.login.forgotPassword')}</Link>
-          <Typography.Text className="text-slate-500">
+          {/* <Typography.Text className="text-slate-500">
             {t('auth.login.adminHint')}
-          </Typography.Text>
+          </Typography.Text> */}
         </div>
       </AuthPageShell>
     </>
