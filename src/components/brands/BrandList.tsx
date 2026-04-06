@@ -1,5 +1,5 @@
 import { EditOutlined } from '@ant-design/icons'
-import { Button, Empty, Space, Table, Tag, Typography } from 'antd'
+import { Button, Empty, Grid, Skeleton, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 
@@ -23,6 +23,8 @@ export function BrandList({
   onSelectBrand,
 }: BrandListProps) {
   const { t } = useTranslation()
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
 
   const columns: ColumnsType<CarBrand> = [
     {
@@ -63,6 +65,93 @@ export function BrandList({
     },
   ]
 
+  if (isMobile) {
+    if (loading) {
+      return (
+        <div className="mobile-card-list gap-2.5">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={`brand-skeleton-${index}`}
+              className="rounded-[20px] border border-slate-200/80 bg-white p-3.5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
+            >
+              <Skeleton active paragraph={{ rows: 3 }} title={{ width: '50%' }} />
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (!brands.length) {
+      return (
+        <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8">
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('brands.list.empty')} />
+        </div>
+      )
+    }
+
+    return (
+      <div className="mobile-card-list gap-2.5">
+        {brands.map((brand) => {
+          const isSelected = Boolean(brand.id && brand.id === selectedBrandId)
+          const isActive = brand.isActive !== false
+
+          return (
+            <article
+              key={brand.id ?? brand.name}
+              className={[
+                'rounded-[20px] border bg-white p-3.5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)] transition',
+                isSelected ? 'border-teal-200 bg-teal-50/60' : 'border-slate-200/80',
+              ].join(' ')}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    className="mobile-clamp-1 cursor-pointer bg-transparent text-left text-[15px] font-semibold text-slate-900 transition hover:text-teal-700"
+                    onClick={() => onSelectBrand?.(brand)}
+                  >
+                    {brand.name}
+                  </button>
+                  <p className="mb-0 mt-1 text-sm leading-5 text-slate-500">{t('brands.list.helper')}</p>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Tag color={isActive ? 'green' : 'default'} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                    {isActive ? t('common.states.active') : t('common.states.inactive')}
+                  </Tag>
+                  {isSelected ? (
+                    <Tag color="cyan" className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                      {t('common.states.selected')}
+                    </Tag>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-200/70 pt-3">
+                {onSelectBrand ? (
+                  <Button
+                    type={isSelected ? 'primary' : 'default'}
+                    className="flex-1 rounded-full"
+                    onClick={() => onSelectBrand(brand)}
+                  >
+                    {isSelected ? t('common.states.selected') : t('common.actions.select')}
+                  </Button>
+                ) : null}
+                <Button
+                  icon={<EditOutlined />}
+                  className={onSelectBrand ? 'flex-1 rounded-full' : 'w-full rounded-full'}
+                  onClick={() => onEdit(brand)}
+                >
+                  {t('common.actions.edit')}
+                </Button>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <Table
       className="data-table"
@@ -71,6 +160,7 @@ export function BrandList({
       rowKey="id"
       loading={loading}
       pagination={{ pageSize: 8, showSizeChanger: false, hideOnSinglePage: true }}
+      scroll={{ x: 680 }}
       rowClassName={(record) =>
         record.id === selectedBrandId ? 'bg-teal-50/70' : onSelectBrand ? 'cursor-pointer' : ''
       }

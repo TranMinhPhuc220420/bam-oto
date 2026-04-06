@@ -1,12 +1,13 @@
 @media (max-width: 640px) {
   .ant-layout-header {
     padding: 0px !important;
+    padding-top: 30px !important;
   }
-  .ant-layout-content {
-    padding: 0px !important;
-  }
-  .ant-card-body {
-    padding-left: 5px !important;
-    padding-right: 5px !important;
-  }
+  // .ant-layout-content {
+  //   padding: 0px !important;
+  // }
+  // .ant-card-body {
+  //   padding-left: 5px !important;
+  //   padding-right: 5px !important;
+  // }
 }

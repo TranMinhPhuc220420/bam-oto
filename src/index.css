@@ -171,14 +171,14 @@ a {
     --page-gutter-x: 14px;
   }
 
-  .mobile-action-group {
+  /* .mobile-action-group {
     width: 100%;
-  }
+  } */
 
-  .mobile-action-group > * {
+  /* .mobile-action-group > * {
     flex: 1 1 100%;
     min-width: 0;
-  }
+  } */
 
   .data-table .ant-table-pagination {
     padding: 0 12px 12px;

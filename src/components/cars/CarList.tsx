@@ -1,6 +1,6 @@
-import { Button, Empty, Grid, Popconfirm, Skeleton, Space, Table, Tag, Typography } from 'antd'
+import { BgColorsOutlined, CalendarOutlined, DeleteOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Button, Empty, Grid, Popconfirm, Skeleton, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -34,6 +34,33 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
 
+  const renderCurrentBookingContent = (record: Car, compact = false) => {
+    const activeBooking = record.id ? activeBookingByCarId[record.id] : undefined
+
+    if (record.status !== 'rented') {
+      return <Text className="text-slate-400">—</Text>
+    }
+
+    if (!activeBooking?.id) {
+      return (
+        <Text className={compact ? 'text-xs text-amber-700' : 'text-sm text-amber-700'}>
+          {t('cars.list.noCurrentBooking')}
+        </Text>
+      )
+    }
+
+    return (
+      <Button
+        type="link"
+        size={compact ? 'small' : 'middle'}
+        className="px-0"
+        onClick={() => navigate(`/bookings/${activeBooking.id}`)}
+      >
+        {activeBooking.bookingCode}
+      </Button>
+    )
+  }
+
   const columns: ColumnsType<Car> = [
     // Image
     {
@@ -63,9 +90,13 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
       sorter: (a, b) => a.plateNumber.localeCompare(b.plateNumber),
       render: (_, record) => (
         <div className="space-y-1">
-          <Text strong className="text-slate-900">
+          <button
+            type="button"
+            className="cursor-pointer bg-transparent p-0 text-left text-sm font-semibold text-slate-900 transition hover:text-teal-700"
+            onClick={() => onEdit(record)}
+          >
             {record.plateNumber}
-          </Text>
+          </button>
           <div className="text-sm text-slate-500">
             {[record.brand, record.model].filter(Boolean).join(' • ') || t('cars.list.missingBrandModel')}
           </div>
@@ -104,23 +135,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
     {
       title: t('cars.list.currentBooking'),
       key: 'currentBooking',
-      render: (_, record) => {
-        const activeBooking = record.id ? activeBookingByCarId[record.id] : undefined
-
-        if (record.status !== 'rented') {
-          return <Text className="text-slate-400">—</Text>
-        }
-
-        if (!activeBooking?.id) {
-          return <Text className="text-sm text-amber-700">{t('cars.list.noCurrentBooking')}</Text>
-        }
-
-        return (
-          <Button type="link" className="px-0" onClick={() => navigate(`/bookings/${activeBooking.id}`)}>
-            {activeBooking.bookingCode}
-          </Button>
-        )
-      },
+      render: (_, record) => renderCurrentBookingContent(record),
     },
     {
       title: t('cars.list.actions'),
@@ -128,9 +143,15 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
       align: 'right',
       render: (_, record) => (
         <Space size="small">
-          <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
-            {t('common.actions.edit')}
-          </Button>
+          <Tooltip title={t('common.actions.edit')}>
+            <Button
+              icon={<EditOutlined />}
+              size='small'
+              shape="circle"
+              aria-label={t('common.actions.edit')}
+              onClick={() => onEdit(record)}
+            />
+          </Tooltip>
           <Popconfirm
             title={t('cars.list.deleteTitle')}
             description={t('cars.list.deleteDescription')}
@@ -138,9 +159,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
             okText={t('common.actions.delete')}
             cancelText={t('common.actions.cancel')}
           >
-            <Button icon={<DeleteOutlined />} danger>
-              {t('common.actions.delete')}
-            </Button>
+            <Button icon={<DeleteOutlined />} size='small' danger shape="circle" aria-label={t('common.actions.delete')} />
           </Popconfirm>
         </Space>
       ),
@@ -172,14 +191,16 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
     }
 
     return (
-      <div className="mobile-card-list">
+      <div className="mobile-card-list gap-2.5">
         {cars.map((record) => {
-          const activeBooking = record.id ? activeBookingByCarId[record.id] : undefined
+          const brandModelLabel =
+            [record.brand, record.model].filter(Boolean).join(' • ') || t('cars.list.missingBrandModel')
+          const fuelLabel = record.fuelType === 'Gas' ? t('cars.list.fuel.gas') : t('cars.list.fuel.electric')
 
           return (
             <article
               key={record.id ?? record.plateNumber}
-              className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
+              className="rounded-[20px] border border-slate-200/80 bg-white p-3.5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
             >
               <div className="flex items-start gap-3">
                 <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100">
@@ -194,57 +215,73 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <Text strong className="mobile-clamp-1 text-slate-900">
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        className="mobile-clamp-1 cursor-pointer bg-transparent text-left text-[15px] font-semibold text-slate-900 transition hover:text-teal-700"
+                        onClick={() => onEdit(record)}
+                      >
                         {record.plateNumber}
-                      </Text>
-                      <div className="mobile-clamp-2 text-sm text-slate-500">
-                        {[record.brand, record.model].filter(Boolean).join(' • ') || t('cars.list.missingBrandModel')}
-                      </div>
+                      </button>
+                      <div className="mobile-clamp-1 mt-0.5 text-sm text-slate-600">{brandModelLabel}</div>
                     </div>
 
-                    <Tag color={statusColors[record.status]} className="m-0 rounded-full px-3 py-1 font-medium">
+                    <Tag color={statusColors[record.status]} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
                       {t(`cars.list.statusLabels.${record.status}`)}
                     </Tag>
                   </div>
 
-                  <div className="mt-2 text-sm text-slate-600">
-                    {record.year} • {record.fuelType === 'Gas' ? t('cars.list.fuel.gas') : t('cars.list.fuel.electric')}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600">
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarOutlined className="text-slate-400" />
+                      <span>{record.year}</span>
+                    </span>
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                      <ThunderboltOutlined className="text-slate-400" />
+                      <span className="mobile-clamp-1 max-w-[120px]">{fuelLabel}</span>
+                    </span>
+                    <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
+                      <BgColorsOutlined className="text-slate-400" />
+                      <span className="mobile-clamp-1 max-w-[110px]">{record.color}</span>
+                    </span>
                   </div>
-                  <div className="text-xs text-slate-500">{record.color}</div>
                 </div>
               </div>
 
-              <div className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  {t('cars.list.currentBooking')}
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    {t('cars.list.currentBooking')}
+                  </div>
+                  <div className="mobile-clamp-1">{renderCurrentBookingContent(record, true)}</div>
                 </div>
-                {record.status !== 'rented' ? (
-                  <Text className="text-slate-400">—</Text>
-                ) : !activeBooking?.id ? (
-                  <Text className="text-sm text-amber-700">{t('cars.list.noCurrentBooking')}</Text>
-                ) : (
-                  <Button type="link" className="px-0" onClick={() => navigate(`/bookings/${activeBooking.id}`)}>
-                    {activeBooking.bookingCode}
-                  </Button>
-                )}
-              </div>
 
-              <div className="mobile-action-group mt-3">
-                <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
-                  {t('common.actions.edit')}
-                </Button>
-                <Popconfirm
-                  title={t('cars.list.deleteTitle')}
-                  description={t('cars.list.deleteDescription')}
-                  onConfirm={() => onDelete(record.id as string)}
-                  okText={t('common.actions.delete')}
-                  cancelText={t('common.actions.cancel')}
-                >
-                  <Button icon={<DeleteOutlined />} danger>
-                    {t('common.actions.delete')}
-                  </Button>
-                </Popconfirm>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Tooltip title={t('common.actions.edit')}>
+                    <Button
+                      icon={<EditOutlined />}
+                      shape="circle"
+                      size="small"
+                      aria-label={t('common.actions.edit')}
+                      onClick={() => onEdit(record)}
+                    />
+                  </Tooltip>
+                  <Popconfirm
+                    title={t('cars.list.deleteTitle')}
+                    description={t('cars.list.deleteDescription')}
+                    onConfirm={() => onDelete(record.id as string)}
+                    okText={t('common.actions.delete')}
+                    cancelText={t('common.actions.cancel')}
+                  >
+                    <Button
+                      icon={<DeleteOutlined />}
+                      danger
+                      shape="circle"
+                      size="small"
+                      aria-label={t('common.actions.delete')}
+                    />
+                  </Popconfirm>
+                </div>
               </div>
             </article>
           )

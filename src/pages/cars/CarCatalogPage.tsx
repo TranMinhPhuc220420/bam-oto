@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ApartmentOutlined,
+  ArrowLeftOutlined,
   CheckCircleOutlined,
   PlusOutlined,
   TagsOutlined,
@@ -23,9 +24,11 @@ import { CarModel } from '../../types/Model'
 
 export function CarCatalogPage() {
   const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
   const { brands, loading: brandsLoading } = useCarBrands({ includeInactive: true })
   const { models, loading: modelsLoading } = useCarModels(undefined, { includeInactive: true })
   const [selectedBrandId, setSelectedBrandId] = useState<string | undefined>()
+  const [mobileView, setMobileView] = useState<'brands' | 'models'>('brands')
   const [savingBrand, setSavingBrand] = useState(false)
   const [savingModel, setSavingModel] = useState(false)
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false)
@@ -48,6 +51,12 @@ export function CarCatalogPage() {
     }
   }, [brands, selectedBrandId])
 
+  useEffect(() => {
+    if (!isMobile || !selectedBrandId) {
+      setMobileView('brands')
+    }
+  }, [isMobile, selectedBrandId])
+
   const brandNames = useMemo(
     () =>
       brands.reduce<Record<string, string>>((accumulator, brand) => {
@@ -67,7 +76,6 @@ export function CarCatalogPage() {
 
   const activeBrandCount = useMemo(() => brands.filter((brand) => brand.isActive !== false).length, [brands])
   const selectedBrandName = selectedBrandId ? brandNames[selectedBrandId] : undefined
-  const loading = brandsLoading || modelsLoading
 
   const openCreateBrandModal = () => {
     setEditingBrand(null)
@@ -89,6 +97,18 @@ export function CarCatalogPage() {
     setEditingModel(model)
     setSelectedBrandId(model.brandId)
     setIsModelModalOpen(true)
+  }
+
+  const handleSelectBrand = (brand: CarBrand) => {
+    setSelectedBrandId(brand.id)
+
+    if (isMobile) {
+      setMobileView('models')
+    }
+  }
+
+  const handleBackToBrands = () => {
+    setMobileView('brands')
   }
 
   const handleBrandSubmit = async (values: BrandFormValues) => {
@@ -137,22 +157,139 @@ export function CarCatalogPage() {
     }
   }
 
+  const brandModal = (
+    <Modal
+      open={isBrandModalOpen}
+      title={editingBrand ? t('brands.page.editModal') : t('brands.page.createModal')}
+      onCancel={() => {
+        setIsBrandModalOpen(false)
+        setEditingBrand(null)
+      }}
+      footer={null}
+      destroyOnHidden
+      centered={!isMobile}
+      width={isMobile ? 'calc(100vw - 24px)' : 560}
+    >
+      <BrandForm
+        initialValues={editingBrand ?? undefined}
+        onSubmit={(values) => {
+          void handleBrandSubmit(values)
+        }}
+        isLoading={savingBrand}
+      />
+    </Modal>
+  )
+
+  const modelModal = (
+    <Modal
+      open={isModelModalOpen}
+      title={editingModel ? t('models.page.editModal') : t('models.page.createModal')}
+      onCancel={() => {
+        setIsModelModalOpen(false)
+        setEditingModel(null)
+      }}
+      footer={null}
+      destroyOnHidden
+      centered={!isMobile}
+      width={isMobile ? 'calc(100vw - 24px)' : 560}
+    >
+      <ModelForm
+        initialValues={editingModel ?? { brandId: selectedBrandId, isActive: true }}
+        onSubmit={(values) => {
+          void handleModelSubmit(values)
+        }}
+        isLoading={savingModel}
+      />
+    </Modal>
+  )
+
+  if (isMobile) {
+    const showModelPanel = mobileView === 'models' && Boolean(selectedBrandId)
+
+    return (
+      <div className="mobile-safe-bottom space-y-4">
+        {showModelPanel ? (
+          <SectionCard
+            title={selectedBrandName ?? t('catalog.page.modelSectionTitle')}
+            description={
+              selectedBrandName
+                ? t('catalog.page.modelSectionSelectedDescription', { brand: selectedBrandName })
+                : t('catalog.page.modelSectionDescription')
+            }
+            actions={
+              <div className="flex w-full items-center gap-2">
+                <Button icon={<ArrowLeftOutlined />} size='small' className="rounded-full" onClick={handleBackToBrands}>
+                  {t('common.actions.back')}
+                </Button>
+                <Button
+                  type="primary"
+                  size='small'
+                  icon={<PlusOutlined />}
+                  className="flex-1 rounded-full"
+                  onClick={openCreateModelModal}
+                  disabled={!brands.length}
+                >
+                  {t('models.page.add')}
+                </Button>
+              </div>
+            }
+          >
+            <ModelList
+              models={filteredModels}
+              brandNames={brandNames}
+              loading={modelsLoading}
+              onEdit={openEditModelModal}
+            />
+          </SectionCard>
+        ) : (
+          <SectionCard
+            title={t('catalog.page.brandSectionTitle')}
+            description={t('catalog.page.brandSectionDescription')}
+            actions={
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size='small'
+                block
+                className="rounded-full"
+                onClick={openCreateBrandModal}
+              >
+                {t('brands.page.add')}
+              </Button>
+            }
+          >
+            <BrandList
+              brands={brands}
+              loading={brandsLoading}
+              onEdit={openEditBrandModal}
+              selectedBrandId={selectedBrandId}
+              onSelectBrand={handleSelectBrand}
+            />
+          </SectionCard>
+        )}
+
+        {brandModal}
+        {modelModal}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-5">
-      {(screens.md || screens.lg) && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard
-            label={t('brands.metrics.total')}
-            value={brands.length}
-            hint={t('catalog.page.totalBrandsHint')}
-            icon={<TagsOutlined />}
-          />
-          <MetricCard
-            label={t('brands.metrics.active')}
-            value={activeBrandCount}
-            hint={t('catalog.page.activeBrandsHint')}
-            icon={<CheckCircleOutlined />}
-          />
+    <div className="mobile-safe-bottom space-y-4 sm:space-y-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <MetricCard
+          label={t('brands.metrics.total')}
+          value={brands.length}
+          hint={t('catalog.page.totalBrandsHint')}
+          icon={<TagsOutlined />}
+        />
+        <MetricCard
+          label={t('brands.metrics.active')}
+          value={activeBrandCount}
+          hint={t('catalog.page.activeBrandsHint')}
+          icon={<CheckCircleOutlined />}
+        />
+        <div className="col-span-2 md:col-span-1">
           <MetricCard
             label={t('models.metrics.total')}
             value={models.length}
@@ -160,10 +297,9 @@ export function CarCatalogPage() {
             icon={<ApartmentOutlined />}
           />
         </div>
-      )}
+      </div>
 
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:gap-5">
         <SectionCard
           title={t('catalog.page.brandSectionTitle')}
           description={t('catalog.page.brandSectionDescription')}
@@ -181,7 +317,7 @@ export function CarCatalogPage() {
         >
           <BrandList
             brands={brands}
-            loading={loading}
+            loading={brandsLoading}
             onEdit={openEditBrandModal}
             selectedBrandId={selectedBrandId}
             onSelectBrand={(brand) => setSelectedBrandId(brand.id)}
@@ -196,20 +332,20 @@ export function CarCatalogPage() {
               : t('catalog.page.modelSectionDescription')
           }
           actions={
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end">
               <BrandSelector
                 includeInactive
                 allowClear
                 value={selectedBrandId}
                 onChange={(value) => setSelectedBrandId(value)}
-                className="min-w-[220px]"
+                className="w-full min-w-0 sm:min-w-[220px]"
                 placeholder={t('catalog.page.filterPlaceholder')}
               />
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 size="large"
-                className="rounded-full px-6"
+                className="rounded-full px-6 sm:w-auto"
                 onClick={openCreateModelModal}
                 disabled={!brands.length}
               >
@@ -221,53 +357,14 @@ export function CarCatalogPage() {
           <ModelList
             models={filteredModels}
             brandNames={brandNames}
-            loading={loading}
+            loading={modelsLoading}
             onEdit={openEditModelModal}
           />
         </SectionCard>
       </div>
 
-      <Modal
-        open={isBrandModalOpen}
-        title={editingBrand ? t('brands.page.editModal') : t('brands.page.createModal')}
-        onCancel={() => {
-          setIsBrandModalOpen(false)
-          setEditingBrand(null)
-        }}
-        footer={null}
-        destroyOnHidden
-        centered
-        width={560}
-      >
-        <BrandForm
-          initialValues={editingBrand ?? undefined}
-          onSubmit={(values) => {
-            void handleBrandSubmit(values)
-          }}
-          isLoading={savingBrand}
-        />
-      </Modal>
-
-      <Modal
-        open={isModelModalOpen}
-        title={editingModel ? t('models.page.editModal') : t('models.page.createModal')}
-        onCancel={() => {
-          setIsModelModalOpen(false)
-          setEditingModel(null)
-        }}
-        footer={null}
-        destroyOnHidden
-        centered
-        width={560}
-      >
-        <ModelForm
-          initialValues={editingModel ?? { brandId: selectedBrandId, isActive: true }}
-          onSubmit={(values) => {
-            void handleModelSubmit(values)
-          }}
-          isLoading={savingModel}
-        />
-      </Modal>
+      {brandModal}
+      {modelModal}
     </div>
   )
 }

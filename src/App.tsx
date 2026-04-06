@@ -13,6 +13,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import { BookingsPage } from './pages/BookingsPage'
 import { CarsPage } from './pages/CarsPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { BookingDetailPage } from './pages/bookings/BookingDetailPage'
 import { EditBookingPage } from './pages/bookings/EditBookingPage'
 import { NewBookingPage } from './pages/bookings/NewBookingPage'
@@ -52,6 +53,7 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/cars" element={<CarsPage />} />
           <Route path="/cars/new" element={<NewCarPage />} />
           <Route path="/cars/edit/:id" element={<EditCarPage />} />

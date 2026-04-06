@@ -15,6 +15,7 @@ import {
   BankOutlined,
   CalendarOutlined,
   CarOutlined,
+  DashboardOutlined,
   LogoutOutlined,
   MenuOutlined,
   PlusOutlined,
@@ -33,6 +34,7 @@ const { Header, Content, Sider } = Layout
 const publicDomain = import.meta.env.VITE_PUBLIC_DOMAIN ?? 'bam.plt.pro.vn'
 
 type RouteKey =
+  | 'dashboard'
   | 'catalog'
   | 'newCar'
   | 'editCar'
@@ -51,6 +53,7 @@ type RouteMeta = {
 }
 
 const routeMeta: RouteMeta[] = [
+  { path: '/dashboard', key: 'dashboard' },
   { path: '/cars/catalog', key: 'catalog' },
   { path: '/cars/new', key: 'newCar' },
   { path: '/cars/edit', key: 'editCar' },
@@ -77,6 +80,7 @@ export function AppShell() {
 
   const items: MenuProps['items'] = useMemo(() => {
     const baseItems: MenuProps['items'] = [
+      { key: '/dashboard', icon: <DashboardOutlined />, label: t('shell.menu.dashboard') },
       { key: '/bookings', icon: <CalendarOutlined />, label: t('shell.menu.bookings') },
       { key: '/cars', icon: <CarOutlined />, label: t('shell.menu.cars') },
     ]
@@ -99,7 +103,7 @@ export function AppShell() {
     [...routeMeta]
       .sort((left, right) => right.path.length - left.path.length)
       .find((route) => location.pathname.startsWith(route.path)) ??
-    routeMeta.find((route) => route.key === 'cars') ??
+    routeMeta.find((route) => route.key === 'dashboard') ??
     routeMeta[0]
 
   const routeTitle = t(`shell.route.${currentRoute.key}.title`)

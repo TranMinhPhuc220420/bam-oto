@@ -143,7 +143,7 @@ export function CarsPage() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => navigate('/cars/new')}
-            size="large"
+            size="small"
             className="rounded-full px-6 sm:self-start"
           >
             {t('cars.create.title')}

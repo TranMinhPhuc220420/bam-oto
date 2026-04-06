@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Spin, Typography } from 'antd';
+import { App, Button, Card, Grid, Spin, Typography } from 'antd';
 import { LeftOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -35,6 +35,8 @@ export function EditCarPage() {
   const [car, setCar] = useState<Car | null>(null);
   const { t } = useTranslation();
   const { message } = App.useApp();
+  const screen = Grid.useBreakpoint();
+  const isMobile = screen.md === false;
 
   useEffect(() => {
     const fetchCar = async () => {
@@ -93,26 +95,26 @@ export function EditCarPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center space-x-4 mb-6">
-        <Button 
-          icon={<LeftOutlined />} 
-          type="text" 
+    <div className="mx-auto">
+      <div className="sm:mb-6 flex items-center space-x-4">
+        <Button
+          icon={<LeftOutlined />}
+          type="text"
           onClick={() => navigate('/cars')}
         >
-          {t('cars.edit.back')}
+          {!isMobile && t('cars.create.back')}
         </Button>
-        <Title level={2} className="mb-0 text-slate-900 !mt-0">
+        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
           {t('cars.edit.title')}
         </Title>
       </div>
 
       <Card className="rounded-[28px] border-0 shadow-sm p-4">
         {car && (
-          <CarForm 
-            initialValues={car} 
-            onSubmit={handleSubmit} 
-            isLoading={loading} 
+          <CarForm
+            initialValues={car}
+            onSubmit={handleSubmit}
+            isLoading={loading}
           />
         )}
       </Card>

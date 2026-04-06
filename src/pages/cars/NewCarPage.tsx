@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { App, Button, Card, Typography } from 'antd';
+import { App, Button, Card, Grid, Typography } from 'antd';
 import { LeftOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -32,6 +32,8 @@ export function NewCarPage() {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
   const { message } = App.useApp();
+  const screen = Grid.useBreakpoint();
+  const isMobile = screen.md === false;
 
   const handleSubmit = async (values: Partial<Car>) => {
     setLoading(true);
@@ -61,16 +63,16 @@ export function NewCarPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center space-x-4 mb-6">
+    <div className="mx-auto">
+      <div className="sm:mb-6 flex items-center space-x-4">
         <Button 
           icon={<LeftOutlined />} 
           type="text" 
           onClick={() => navigate('/cars')}
         >
-          {t('cars.create.back')}
+          {!isMobile && t('cars.create.back')}
         </Button>
-        <Title level={2} className="mb-0 text-slate-900 !mt-0">
+        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
           {t('cars.create.title')}
         </Title>
       </div>
