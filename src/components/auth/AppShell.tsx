@@ -67,6 +67,8 @@ const routeMeta: RouteMeta[] = [
   { path: '/users', key: 'users' },
 ]
 
+import logo from '../../assets/logo.png'
+
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -128,12 +130,18 @@ export function AppShell() {
   const renderSidebarContent = () => (
     <div className="mobile-safe-bottom flex h-full flex-col px-3 py-4 text-slate-50 sm:px-4 sm:py-5">
       <div className="mb-4 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(15,118,110,0.18))] p-3.5 backdrop-blur sm:mb-5 sm:rounded-[24px] sm:p-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-teal-300 sm:text-[11px] sm:tracking-[0.32em]">
-          {publicDomain}
-        </p>
-        <Typography.Title level={screens.lg ? 3 : 4} className="!mb-1.5 !text-white sm:!mb-2">
-          {t('common.appName')}
-        </Typography.Title>
+        {/* Logo and App Name and Company Name */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-center bg-white rounded-[5px]">
+            <img src={logo} alt="PLT Solutions" className="h-12 w-14" />
+          </div>
+          <div className="flex flex-col">
+            <div className="font-semibold text-white text-2xl">
+              {t('common.appName')}
+            </div>
+            PLT Solutions
+          </div>
+        </div>
         <Typography.Paragraph className="!mb-0 !text-sm !text-slate-300">
           {t('shell.sidebarDescription')}
         </Typography.Paragraph>
