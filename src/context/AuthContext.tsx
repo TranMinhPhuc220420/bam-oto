@@ -61,10 +61,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     currentUser,
     profile,
     loading,
-    signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
-    signUp: (payload) => createManagedUserAccount(payload),
+    signIn: (email: string, password: string) => signInWithEmailAndPassword(auth, email, password),
+    signUp: (payload: SignUpPayload) => createManagedUserAccount(payload),
     signOut: () => firebaseSignOut(auth),
-    resetPassword: (email) => sendPasswordResetEmail(auth, email),
+    resetPassword: (email: string) => sendPasswordResetEmail(auth, email),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

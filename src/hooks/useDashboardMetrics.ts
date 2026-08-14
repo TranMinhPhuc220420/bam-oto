@@ -9,23 +9,7 @@ import { useCustomers } from './useCustomers'
 import { db } from '../services/firebase'
 import type { Booking } from '../types/Booking'
 import type { UserProfile } from '../types/User'
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
-}
+import { toDate } from '../utils/date'
 
 function isOverdueBooking(booking: Booking) {
   const endDate = toDate(booking.endDate)

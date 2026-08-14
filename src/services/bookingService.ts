@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 
 import { db } from './firebase'
+import { findCustomerByPhone, saveCustomer } from './customerService'
 import { deleteBookingDocument } from './supabaseStorage'
 import {
   Booking,
@@ -26,10 +27,10 @@ import {
   PaymentStatus,
 } from '../types/Booking'
 import { Car } from '../types/Car'
-import { Customer } from '../types/Customer'
 import type { Transaction } from '../types/Transaction'
 import { TransactionType } from '../types/Transaction'
 import type { UserRole } from '../types/User'
+import { toDate } from '../utils/date'
 
 export interface BookingFormPayload {
   bookingCode?: string
@@ -370,23 +371,6 @@ export async function deleteBookingWithGuards(
   return { allowed: true }
 }
 
-function toDate(value: unknown): Date | null {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
-}
-
 function buildBookingCode() {
   const now = new Date()
   const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
@@ -484,16 +468,23 @@ export async function ensureCustomerRecord(
     }
   }
 
-  const newCustomer = stripUndefinedFields({
+  const existingCustomer = customerSnapshot.phoneNumber
+    ? await findCustomerByPhone(customerSnapshot.phoneNumber)
+    : null
+
+  if (existingCustomer?.id) {
+    return {
+      customerId: existingCustomer.id,
+      customerSnapshot,
+    }
+  }
+
+  const createdCustomer = await saveCustomer({
     fullName: customerSnapshot.fullName,
     phoneNumber: customerSnapshot.phoneNumber || '',
     email: customerSnapshot.email,
     isActive: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }) as Partial<Customer>
-
-  const createdCustomer = await addDoc(collection(db, 'customers'), newCustomer)
+  })
 
   return {
     customerId: createdCustomer.id,

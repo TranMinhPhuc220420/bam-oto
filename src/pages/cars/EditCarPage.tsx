@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Grid, Spin, Typography } from 'antd';
+import { App, Button, Card, Grid, Spin } from 'antd';
 import { LeftOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -11,8 +11,6 @@ import {
 } from '../../services/carService';
 import { CarForm } from '../../components/cars/CarForm';
 import { Car } from '../../types/Car';
-
-const { Title } = Typography;
 
 function buildCarPayload(values: Partial<Car>): Partial<Car> {
   return Object.fromEntries(
@@ -104,9 +102,6 @@ export function EditCarPage() {
         >
           {!isMobile && t('cars.create.back')}
         </Button>
-        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
-          {t('cars.edit.title')}
-        </Title>
       </div>
 
       <Card className="rounded-[28px] border-0 shadow-sm p-4">

@@ -1,11 +1,18 @@
 import { useState } from 'react'
-import { Alert, Button, Form, Input, Typography, Grid, message } from 'antd'
+import { Button, Form, Input, message } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { AuthPageShell } from '../components/auth/AuthPageShell'
 import { useAuth } from '../hooks/useAuth'
 import { getFirebaseAuthErrorMessage } from '../services/firebase'
+import {
+  emailRule,
+  formScrollToFirstError,
+  formValidateTrigger,
+  normalizeEmail,
+  requiredTrimmed,
+} from '../utils/validation'
 
 interface LoginFormValues {
   email: string
@@ -30,12 +37,12 @@ export function LoginPage() {
       'pathname' in location.state.from &&
       typeof location.state.from.pathname === 'string'
       ? location.state.from.pathname
-      : '/cars'
+      : '/dashboard'
 
   async function handleSubmit(values: LoginFormValues) {
     try {
       setIsSubmitting(true)
-      const credential = await signIn(values.email, values.password)
+      const credential = await signIn(normalizeEmail(values.email), values.password)
 
       if (!credential.user.emailVerified) {
         messageApi.warning(t('auth.login.unverifiedWarning'))
@@ -56,21 +63,17 @@ export function LoginPage() {
         title={t('auth.login.title')}
         subtitle={t('auth.login.subtitle')}
       >
-        {/* <Alert
-          className="mb-6 rounded-2xl"
-          type="info"
-          showIcon
-          message={t('auth.login.info')}
-        /> */}
-
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          validateTrigger={[...formValidateTrigger]}
+          scrollToFirstError={formScrollToFirstError}
+        >
           <Form.Item
             label={t('auth.login.email')}
             name="email"
-            rules={[
-              { required: true, message: t('auth.validation.emailRequired') },
-              { type: 'email', message: t('auth.validation.emailInvalid') },
-            ]}
+            rules={[requiredTrimmed(t('auth.validation.emailRequired')), emailRule(t('auth.validation.emailInvalid'))]}
           >
             <Input placeholder={t('auth.login.emailPlaceholder')} />
           </Form.Item>
@@ -88,11 +91,8 @@ export function LoginPage() {
           </Button>
         </Form>
 
-        <div className="mt-6 text-sm text-slate-600 text-center">
+        <div className="mt-6 text-center text-sm text-slate-600">
           <Link to="/forgot-password">{t('auth.login.forgotPassword')}</Link>
-          {/* <Typography.Text className="text-slate-500">
-            {t('auth.login.adminHint')}
-          </Typography.Text> */}
         </div>
       </AuthPageShell>
     </>

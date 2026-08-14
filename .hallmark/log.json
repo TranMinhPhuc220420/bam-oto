@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-08-14",
+    "macrostructure": "Workbench",
+    "theme": "existing-teal",
+    "enrichment": "none",
+    "scope": "app",
+    "brief": "Operational copy + IA polish; preserve Ant Design teal tokens"
+  }
+]

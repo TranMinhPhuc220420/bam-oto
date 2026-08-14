@@ -18,7 +18,17 @@ import { MetricCard } from '../../components/ui/MetricCard'
 import { SectionCard } from '../../components/ui/SectionCard'
 import { useCarBrands } from '../../hooks/useCarBrands'
 import { useCarModels } from '../../hooks/useCarModels'
-import { isCatalogDuplicateError, saveCarBrand, saveCarModel } from '../../services/carCatalog'
+import { useCars } from '../../hooks/useCars'
+import { useAuth } from '../../hooks/useAuth'
+import {
+  canDeleteCarBrand,
+  canDeleteCarModel,
+  deleteCarBrandWithGuards,
+  deleteCarModelWithGuards,
+  isCatalogDuplicateError,
+  saveCarBrand,
+  saveCarModel,
+} from '../../services/carCatalog'
 import { CarBrand } from '../../types/Brand'
 import { CarModel } from '../../types/Model'
 
@@ -27,10 +37,14 @@ export function CarCatalogPage() {
   const isMobile = screens.md === false
   const { brands, loading: brandsLoading } = useCarBrands({ includeInactive: true })
   const { models, loading: modelsLoading } = useCarModels(undefined, { includeInactive: true })
+  const { cars } = useCars()
+  const { profile } = useAuth()
   const [selectedBrandId, setSelectedBrandId] = useState<string | undefined>()
   const [mobileView, setMobileView] = useState<'brands' | 'models'>('brands')
   const [savingBrand, setSavingBrand] = useState(false)
   const [savingModel, setSavingModel] = useState(false)
+  const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null)
+  const [deletingModelId, setDeletingModelId] = useState<string | null>(null)
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false)
   const [isModelModalOpen, setIsModelModalOpen] = useState(false)
   const [editingBrand, setEditingBrand] = useState<CarBrand | null>(null)
@@ -109,6 +123,72 @@ export function CarCatalogPage() {
 
   const handleBackToBrands = () => {
     setMobileView('brands')
+  }
+
+  const getBrandDeleteState = (brand: CarBrand) =>
+    canDeleteCarBrand(brand, cars, profile?.role ?? null)
+
+  const getModelDeleteState = (model: CarModel) =>
+    canDeleteCarModel(model, cars, {
+      role: profile?.role ?? null,
+      brand: brands.find((brand) => brand.id === model.brandId) ?? null,
+    })
+
+  const handleDeleteBrand = async (brand: CarBrand) => {
+    const deleteState = getBrandDeleteState(brand)
+
+    if (!deleteState.allowed) {
+      message.warning(t(deleteState.reasonKey ?? 'brands.messages.deleteError'))
+      return
+    }
+
+    setDeletingBrandId(brand.id ?? null)
+
+    try {
+      const result = await deleteCarBrandWithGuards(brand, profile?.role ?? null)
+
+      if (!result.allowed) {
+        message.warning(t(result.reasonKey ?? 'brands.messages.deleteError'))
+        return
+      }
+
+      message.success(t('brands.messages.deleteSuccess'))
+    } catch (error) {
+      console.error('Error deleting car brand:', error)
+      message.error(t('brands.messages.deleteError'))
+    } finally {
+      setDeletingBrandId(null)
+    }
+  }
+
+  const handleDeleteModel = async (model: CarModel) => {
+    const deleteState = getModelDeleteState(model)
+
+    if (!deleteState.allowed) {
+      message.warning(t(deleteState.reasonKey ?? 'models.messages.deleteError'))
+      return
+    }
+
+    setDeletingModelId(model.id ?? null)
+
+    try {
+      const result = await deleteCarModelWithGuards(model, {
+        role: profile?.role ?? null,
+        brand: brands.find((brand) => brand.id === model.brandId) ?? null,
+      })
+
+      if (!result.allowed) {
+        message.warning(t(result.reasonKey ?? 'models.messages.deleteError'))
+        return
+      }
+
+      message.success(t('models.messages.deleteSuccess'))
+    } catch (error) {
+      console.error('Error deleting car model:', error)
+      message.error(t('models.messages.deleteError'))
+    } finally {
+      setDeletingModelId(null)
+    }
   }
 
   const handleBrandSubmit = async (values: BrandFormValues) => {
@@ -239,6 +319,9 @@ export function CarCatalogPage() {
               brandNames={brandNames}
               loading={modelsLoading}
               onEdit={openEditModelModal}
+              onDelete={handleDeleteModel}
+              deletingId={deletingModelId}
+              getDeleteState={getModelDeleteState}
             />
           </SectionCard>
         ) : (
@@ -262,6 +345,9 @@ export function CarCatalogPage() {
               brands={brands}
               loading={brandsLoading}
               onEdit={openEditBrandModal}
+              onDelete={handleDeleteBrand}
+              deletingId={deletingBrandId}
+              getDeleteState={getBrandDeleteState}
               selectedBrandId={selectedBrandId}
               onSelectBrand={handleSelectBrand}
             />
@@ -319,6 +405,9 @@ export function CarCatalogPage() {
             brands={brands}
             loading={brandsLoading}
             onEdit={openEditBrandModal}
+            onDelete={handleDeleteBrand}
+            deletingId={deletingBrandId}
+            getDeleteState={getBrandDeleteState}
             selectedBrandId={selectedBrandId}
             onSelectBrand={(brand) => setSelectedBrandId(brand.id)}
           />
@@ -359,6 +448,9 @@ export function CarCatalogPage() {
             brandNames={brandNames}
             loading={modelsLoading}
             onEdit={openEditModelModal}
+            onDelete={handleDeleteModel}
+            deletingId={deletingModelId}
+            getDeleteState={getModelDeleteState}
           />
         </SectionCard>
       </div>

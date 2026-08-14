@@ -8,7 +8,10 @@ import { canDeleteBooking } from '../../services/bookingService'
 import { Booking, BookingStatus, PaymentStatus } from '../../types/Booking'
 import type { UserRole } from '../../types/User'
 import { formatCurrencyVnd } from '../../utils/currency'
+import { toDate } from '../../utils/date'
 import { BookingDocumentsPreview } from './BookingDocumentsPreview'
+import { EmptyCopy } from '../ui/EmptyCopy'
+import { MoneyText } from '../ui/MoneyText'
 import { useNavigate } from 'react-router-dom'
 
 interface BookingListProps {
@@ -42,23 +45,6 @@ function getBookingDocumentUrls(documentUrls?: string[], documentUrl?: string) {
   return Array.from(
     new Set([...(documentUrls ?? []), ...(documentUrl ? [documentUrl] : [])].filter(Boolean))
   )
-}
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
 }
 
 function isOverdueBooking(booking: Booking) {
@@ -186,9 +172,11 @@ export function BookingList({
       key: 'status',
       dataIndex: 'status',
       render: (status: BookingStatus) => (
-        <Tag color={statusColors[status]} className="rounded-full px-3 py-1 font-medium">
-          {t(`bookings.status.${status}`)}
-        </Tag>
+        <Tooltip title={t(`bookings.statusHint.${status}`)}>
+          <Tag color={statusColors[status]} className="rounded-full px-3 py-1 font-medium">
+            {t(`bookings.status.${status}`)}
+          </Tag>
+        </Tooltip>
       ),
       filters: Object.keys(statusColors).map((status) => ({
         text: t(`bookings.status.${status}`),
@@ -206,6 +194,7 @@ export function BookingList({
             {t(`bookings.paymentStatus.${status}`)}
           </Tag>
           <div className="text-xs text-slate-500">
+            <span className="money-amount">
             {t('bookings.list.remaining', {
               paid: formatCurrencyVnd(record.paidAmount ?? 0, i18n.resolvedLanguage),
               remaining: formatCurrencyVnd(
@@ -213,6 +202,7 @@ export function BookingList({
                 i18n.resolvedLanguage
               ),
             })}
+            </span>
           </div>
         </div>
       ),
@@ -247,7 +237,9 @@ export function BookingList({
       dataIndex: 'totalPrice',
       align: 'right',
       sorter: (a, b) => a.totalPrice - b.totalPrice,
-      render: (value: number) => formatCurrencyVnd(value ?? 0, i18n.resolvedLanguage),
+      render: (value: number) => (
+        <MoneyText value={value ?? 0} language={i18n.resolvedLanguage} />
+      ),
     },
     {
       title: t('bookings.list.actions'),
@@ -312,7 +304,10 @@ export function BookingList({
     if (!bookings.length) {
       return (
         <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('bookings.list.empty')} />
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={<EmptyCopy title={t('bookings.list.empty')} hint={t('bookings.list.emptyHint')} />}
+          />
         </div>
       )
     }
@@ -352,9 +347,11 @@ export function BookingList({
                 </div>
 
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <Tag color={statusColors[record.status]} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                    {t(`bookings.status.${record.status}`)}
-                  </Tag>
+                  <Tooltip title={t(`bookings.statusHint.${record.status}`)}>
+                    <Tag color={statusColors[record.status]} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                      {t(`bookings.status.${record.status}`)}
+                    </Tag>
+                  </Tooltip>
                   <Tag color={paymentColors[record.paymentStatus]} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
                     {t(`bookings.paymentStatus.${record.paymentStatus}`)}
                   </Tag>
@@ -378,12 +375,13 @@ export function BookingList({
                     {t('bookings.list.overdue')}
                   </Tag>
                 ) : null}
-                <div className="mt-2 text-[15px] font-semibold text-slate-900">
-                  <div className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
-                    <DollarCircleOutlined className="text-slate-400" />
-                    {formatCurrencyVnd(record.totalPrice ?? 0, i18n.resolvedLanguage)}
+                <div className="mt-2 min-w-0 text-[15px] font-semibold text-slate-900">
+                  <div className="inline-flex min-w-0 max-w-full items-start gap-1.5 text-[15px] font-semibold text-slate-900">
+                    <DollarCircleOutlined className="mt-0.5 shrink-0 text-slate-400" />
+                    <MoneyText value={record.totalPrice ?? 0} language={i18n.resolvedLanguage} />
                   </div>
-                  <div className="mobile-clamp-1 mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs text-slate-500">
+                    <span className="money-amount">
                     {t('bookings.list.remaining', {
                       paid: formatCurrencyVnd(record.paidAmount ?? 0, i18n.resolvedLanguage),
                       remaining: formatCurrencyVnd(
@@ -391,6 +389,7 @@ export function BookingList({
                         i18n.resolvedLanguage
                       ),
                     })}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -483,7 +482,12 @@ export function BookingList({
       pagination={{ pageSize: 8, showSizeChanger: false, hideOnSinglePage: true }}
       scroll={{ x: 980 }}
       locale={{
-        emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('bookings.list.empty')} />,
+        emptyText: (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={<EmptyCopy title={t('bookings.list.empty')} hint={t('bookings.list.emptyHint')} />}
+          />
+        ),
       }}
     />
   )

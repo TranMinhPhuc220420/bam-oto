@@ -19,7 +19,10 @@ import { BrandForm, type BrandFormValues } from '../../components/brands/BrandFo
 import { BrandList } from '../../components/brands/BrandList'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { SectionCard } from '../../components/ui/SectionCard'
+import { useAuth } from '../../hooks/useAuth'
+import { useCars } from '../../hooks/useCars'
 import { db } from '../../services/firebase'
+import { canDeleteCarBrand, deleteCarBrandWithGuards } from '../../services/carCatalog'
 import { CarBrand } from '../../types/Brand'
 
 function normalizeName(value: string) {
@@ -31,8 +34,11 @@ export function CarBrandsPage() {
   const [brands, setBrands] = useState<CarBrand[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBrand, setEditingBrand] = useState<CarBrand | null>(null)
+  const { cars } = useCars()
+  const { profile } = useAuth()
   const { t } = useTranslation()
   const { message } = App.useApp()
 
@@ -75,6 +81,35 @@ export function CarBrandsPage() {
   const closeModal = () => {
     setEditingBrand(null)
     setIsModalOpen(false)
+  }
+
+  const getBrandDeleteState = (brand: CarBrand) => canDeleteCarBrand(brand, cars, profile?.role ?? null)
+
+  const handleDelete = async (brand: CarBrand) => {
+    const deleteState = getBrandDeleteState(brand)
+
+    if (!deleteState.allowed) {
+      message.warning(t(deleteState.reasonKey ?? 'brands.messages.deleteError'))
+      return
+    }
+
+    setDeletingBrandId(brand.id ?? null)
+
+    try {
+      const result = await deleteCarBrandWithGuards(brand, profile?.role ?? null)
+
+      if (!result.allowed) {
+        message.warning(t(result.reasonKey ?? 'brands.messages.deleteError'))
+        return
+      }
+
+      message.success(t('brands.messages.deleteSuccess'))
+    } catch (error) {
+      console.error('Error deleting car brand:', error)
+      message.error(t('brands.messages.deleteError'))
+    } finally {
+      setDeletingBrandId(null)
+    }
   }
 
   const handleSubmit = async (values: BrandFormValues) => {
@@ -180,7 +215,14 @@ export function CarBrandsPage() {
           </Button>
         }
       >
-        <BrandList brands={brands} loading={loading} onEdit={openEditModal} />
+        <BrandList
+          brands={brands}
+          loading={loading}
+          onEdit={openEditModal}
+          onDelete={handleDelete}
+          deletingId={deletingBrandId}
+          getDeleteState={getBrandDeleteState}
+        />
       </SectionCard>
 
       <Modal

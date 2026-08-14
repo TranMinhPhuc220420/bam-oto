@@ -1,3 +1,7 @@
+export const MAX_MONEY_AMOUNT = 99_999_999_999
+
+const MAX_MONEY_DIGITS = String(MAX_MONEY_AMOUNT).length
+
 export function getCurrencyLocale(language?: string) {
   return language?.startsWith('vi') ? 'vi-VN' : 'en-GB'
 }
@@ -27,7 +31,21 @@ export function formatVndInput(value: string | number | null | undefined) {
 }
 
 export function parseVndInput(value: string | undefined) {
-  const numericValue = Number((value ?? '').replace(/[^\d-]/g, ''))
+  const digits = (value ?? '').replace(/[^\d]/g, '')
 
-  return Number.isFinite(numericValue) ? numericValue : 0
+  if (!digits) {
+    return 0
+  }
+
+  if (digits.length > MAX_MONEY_DIGITS) {
+    return MAX_MONEY_AMOUNT
+  }
+
+  const numericValue = Number(digits)
+
+  if (!Number.isFinite(numericValue)) {
+    return 0
+  }
+
+  return Math.min(numericValue, MAX_MONEY_AMOUNT)
 }

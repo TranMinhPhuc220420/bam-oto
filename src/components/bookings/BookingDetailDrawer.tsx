@@ -15,9 +15,10 @@ import { useTranslation } from 'react-i18next'
 
 import { calculateBookingFinancials, getBookingAdjustmentItems, getBookingExtraChargeItems } from '../../services/bookingService'
 import { Booking, BookingStatus, PaymentStatus } from '../../types/Booking'
-import { formatCurrencyVnd } from '../../utils/currency'
+import { toDate } from '../../utils/date'
 import { BookingDocumentsPreview } from './BookingDocumentsPreview'
 import { BookingTransactionList } from './BookingTransactionList'
+import { MoneyText } from '../ui/MoneyText'
 
 interface BookingDetailDrawerProps {
   booking: Booking | null
@@ -51,23 +52,6 @@ const paymentColors: Record<PaymentStatus, string> = {
 
 function getBookingDocumentUrls(documentUrls?: string[], documentUrl?: string) {
   return Array.from(new Set([...(documentUrls ?? []), ...(documentUrl ? [documentUrl] : [])].filter(Boolean)))
-}
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
 }
 
 function BreakdownSection({
@@ -120,8 +104,8 @@ function BreakdownSection({
                   {item.note ? <Typography.Text className="block text-xs text-slate-500">{item.note}</Typography.Text> : null}
                 </div>
 
-                <Typography.Text className="shrink-0 text-right text-sm font-semibold text-slate-900">
-                  {formatCurrencyVnd(item.amount, locale)}
+                <Typography.Text className="min-w-0 text-right text-sm font-semibold text-slate-900">
+                  <MoneyText value={item.amount} language={locale} />
                 </Typography.Text>
               </div>
             </div>
@@ -129,7 +113,7 @@ function BreakdownSection({
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-          <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
             <span>{labels.label}</span>
             <span>{labels.type}</span>
             <span className="text-right">{labels.amount}</span>
@@ -138,7 +122,7 @@ function BreakdownSection({
           {items.map((item) => (
             <div
               key={item.key}
-              className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_140px] gap-3 border-t border-slate-100 px-4 py-3"
+              className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 border-t border-slate-100 px-4 py-3"
             >
               <div className="min-w-0">
                 <Typography.Text className="block text-sm font-medium text-slate-900">
@@ -147,8 +131,8 @@ function BreakdownSection({
                 {item.note ? <Typography.Text className="text-xs text-slate-500">{item.note}</Typography.Text> : null}
               </div>
               <Typography.Text className="text-sm text-slate-600">{item.typeLabel}</Typography.Text>
-              <Typography.Text className="text-right text-sm font-semibold text-slate-900">
-                {formatCurrencyVnd(item.amount, locale)}
+              <Typography.Text className="min-w-0 text-right text-sm font-semibold text-slate-900">
+                <MoneyText value={item.amount} language={locale} />
               </Typography.Text>
             </div>
           ))}
@@ -197,8 +181,6 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
       minute: '2-digit',
     }).format(value)
   }
-
-  const formatCurrency = (value: number) => formatCurrencyVnd(value, i18n.resolvedLanguage)
 
   const durationDays =
     startDate && endDate ? Math.max(1, Math.ceil(dayjs(endDate).diff(dayjs(startDate), 'day', true))) : null
@@ -390,35 +372,51 @@ export function BookingDetailContent({ booking }: { booking: Booking }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.fixedTotal')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.fixedTotal)}</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <MoneyText value={financials.fixedTotal} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.surchargeTotal')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.extraChargesTotal)}</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <MoneyText value={financials.extraChargesTotal} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.adjustmentTotal')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-rose-600">{formatCurrency(financials.discountRefundTotal)}</div>
+            <div className="mt-1 text-lg font-semibold text-rose-600">
+              <MoneyText value={financials.discountRefundTotal} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.finance.total')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.totalPrice)}</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <MoneyText value={financials.totalPrice} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.paidAmount')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(financials.paidAmount)}</div>
+            <div className="mt-1 text-lg font-semibold text-emerald-700">
+              <MoneyText value={financials.paidAmount} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.remainingAmount')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-amber-700">{formatCurrency(financials.remainingAmount)}</div>
+            <div className="mt-1 text-lg font-semibold text-amber-700">
+              <MoneyText value={financials.remainingAmount} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.refundAmount')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.refundAmount)}</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <MoneyText value={financials.refundAmount} language={i18n.resolvedLanguage} />
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
             <Typography.Text className="text-xs text-slate-500">{t('bookings.details.securityDeposit')}</Typography.Text>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(financials.securityDeposit)}</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <MoneyText value={financials.securityDeposit} language={i18n.resolvedLanguage} />
+            </div>
           </div>
         </div>
       </div>

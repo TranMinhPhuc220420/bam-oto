@@ -1,43 +1,22 @@
 import {
-  ArrowRightOutlined,
-  BankOutlined,
-  CalendarOutlined,
   CarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   PlusOutlined,
-  TeamOutlined,
-  ToolOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Empty, Grid, Progress, Skeleton, Tag } from 'antd'
-import type { ReactNode } from 'react'
+import { Button, Empty, Grid, Progress, Skeleton } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
+import { EmptyCopy } from '../components/ui/EmptyCopy'
 import { MetricCard } from '../components/ui/MetricCard'
-import { PageHero } from '../components/ui/PageHero'
 import { SectionCard } from '../components/ui/SectionCard'
 import { useDashboardMetrics } from '../hooks/useDashboardMetrics'
 import type { Booking, BookingStatus } from '../types/Booking'
-import { formatCurrencyVnd, getCurrencyLocale } from '../utils/currency'
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
-}
+import { getCurrencyLocale } from '../utils/currency'
+import { toDate } from '../utils/date'
+import { MoneyText } from '../components/ui/MoneyText'
 
 function getBookingStatusColor(status: BookingStatus) {
   switch (status) {
@@ -90,19 +69,22 @@ function UpcomingBookingCard({ booking, language, onOpen }: { booking: Booking; 
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="mb-0 text-sm font-semibold text-slate-900">{booking.bookingCode}</p>
-            <Tag color={getBookingStatusColor(booking.status)} className="m-0 rounded-full">
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              getBookingStatusColor(booking.status) === 'success'
+                ? 'bg-emerald-50 text-emerald-700'
+                : getBookingStatusColor(booking.status) === 'processing'
+                  ? 'bg-cyan-50 text-cyan-700'
+                  : getBookingStatusColor(booking.status) === 'error'
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-amber-50 text-amber-700'
+            }`}>
               {t(`bookings.status.${booking.status}`)}
-            </Tag>
+            </span>
           </div>
           <p className="mobile-clamp-1 mb-0 text-sm text-slate-600">
             {booking.customerSnapshot?.fullName || t('dashboard.upcoming.customerFallback')}
           </p>
         </div>
-
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-teal-700">
-          <ArrowRightOutlined />
-          {t('common.actions.view')}
-        </span>
       </div>
 
       <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
@@ -133,40 +115,6 @@ function UpcomingBookingCard({ booking, language, onOpen }: { booking: Booking; 
   )
 }
 
-function QuickActionCard({
-  title,
-  description,
-  icon,
-  toneClass,
-  onClick,
-}: {
-  title: string
-  description: string
-  icon: ReactNode
-  toneClass: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex h-full w-full flex-col gap-3 rounded-[20px] border border-slate-200/80 bg-white px-3.5 py-3.5 text-left transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl text-base ${toneClass}`}>
-          {icon}
-        </div>
-        <ArrowRightOutlined className="text-slate-400" />
-      </div>
-
-      <div className="space-y-1.5">
-        <p className="mb-0 text-sm font-semibold text-slate-900">{title}</p>
-        <p className="mb-0 text-sm leading-5 text-slate-600">{description}</p>
-      </div>
-    </button>
-  )
-}
-
 export function DashboardPage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
@@ -183,12 +131,10 @@ export function DashboardPage() {
     todayPickups,
     todayReturns,
     overdueCount,
-    inServiceCars,
     customerCount,
     teamCount,
     totalCollected,
     outstandingBalance,
-    pendingCollectionsCount,
     rentedCars,
     cleaningCars,
     repairCars,
@@ -199,27 +145,14 @@ export function DashboardPage() {
     loading,
   } = useDashboardMetrics()
 
-  const primaryMetrics = [
-    {
-      key: 'active',
-      label: t('dashboard.metrics.activeRentals'),
-      value: activeRentals,
-      hint: t('dashboard.metrics.activeRentalsHint'),
-      icon: <CalendarOutlined />,
-    },
-    {
-      key: 'available',
-      label: t('dashboard.metrics.availableCars'),
-      value: availableCars,
-      hint: t('dashboard.metrics.availableCarsHint'),
-      icon: <CheckCircleOutlined />,
-    },
+  const todayMetrics = [
     {
       key: 'pickups',
       label: t('dashboard.metrics.todayPickups'),
       value: todayPickups,
       hint: t('dashboard.metrics.todayPickupsHint'),
       icon: <ClockCircleOutlined />,
+      onClick: () => navigate('/bookings?scope=today'),
     },
     {
       key: 'returns',
@@ -227,127 +160,54 @@ export function DashboardPage() {
       value: todayReturns,
       hint: t('dashboard.metrics.todayReturnsHint'),
       icon: <CarOutlined />,
-    },
-  ]
-
-  const secondaryMetrics = isAdmin
-    ? [
-        {
-          key: 'overdue',
-          label: t('dashboard.metrics.overdueBookings'),
-          value: overdueCount,
-          hint: t('dashboard.metrics.overdueBookingsHint'),
-          icon: <WarningOutlined />,
-        },
-        {
-          key: 'service',
-          label: t('dashboard.metrics.inService'),
-          value: inServiceCars,
-          hint: t('dashboard.metrics.inServiceHint'),
-          icon: <ToolOutlined />,
-        },
-        {
-          key: 'outstanding',
-          label: t('dashboard.metrics.outstanding'),
-          value: formatCurrencyVnd(outstandingBalance, i18n.resolvedLanguage),
-          hint: t('dashboard.metrics.outstandingHint'),
-          icon: <BankOutlined />,
-        },
-        {
-          key: 'team',
-          label: t('dashboard.metrics.teamMembers'),
-          value: teamCount,
-          hint: t('dashboard.metrics.teamMembersHint'),
-          icon: <TeamOutlined />,
-        },
-      ]
-    : [
-        {
-          key: 'overdue',
-          label: t('dashboard.metrics.overdueBookings'),
-          value: overdueCount,
-          hint: t('dashboard.metrics.overdueBookingsHint'),
-          icon: <WarningOutlined />,
-        },
-        {
-          key: 'service',
-          label: t('dashboard.metrics.inService'),
-          value: inServiceCars,
-          hint: t('dashboard.metrics.inServiceHint'),
-          icon: <ToolOutlined />,
-        },
-        {
-          key: 'customers',
-          label: t('dashboard.metrics.customers'),
-          value: customerCount,
-          hint: t('dashboard.metrics.customersHint'),
-          icon: <TeamOutlined />,
-        },
-      ]
-
-  const quickActions = [
-    {
-      key: 'new-booking',
-      title: t('dashboard.quickActions.newBooking.title'),
-      description: t('dashboard.quickActions.newBooking.description'),
-      icon: <PlusOutlined />,
-      toneClass: 'bg-teal-50 text-teal-700',
-      onClick: () => navigate('/bookings/new'),
+      onClick: () => navigate('/bookings?scope=today'),
     },
     {
-      key: 'bookings',
-      title: t('dashboard.quickActions.bookings.title'),
-      description: t('dashboard.quickActions.bookings.description'),
-      icon: <CalendarOutlined />,
-      toneClass: 'bg-cyan-50 text-cyan-700',
-      onClick: () => navigate('/bookings'),
+      key: 'overdue',
+      label: t('dashboard.metrics.overdueBookings'),
+      value: overdueCount,
+      hint: t('dashboard.metrics.overdueBookingsHint'),
+      icon: <WarningOutlined />,
+      onClick: () => navigate('/bookings?scope=overdue'),
     },
     {
-      key: 'cars',
-      title: t('dashboard.quickActions.cars.title'),
-      description: t('dashboard.quickActions.cars.description'),
-      icon: <CarOutlined />,
-      toneClass: 'bg-emerald-50 text-emerald-700',
+      key: 'available',
+      label: t('dashboard.metrics.availableCars'),
+      value: availableCars,
+      hint: t('dashboard.metrics.availableCarsHint'),
+      icon: <CheckCircleOutlined />,
       onClick: () => navigate('/cars'),
     },
-    ...(isAdmin
-      ? [
-          {
-            key: 'finance',
-            title: t('dashboard.quickActions.finance.title'),
-            description: t('dashboard.quickActions.finance.description'),
-            icon: <BankOutlined />,
-            toneClass: 'bg-violet-50 text-violet-700',
-            onClick: () => navigate('/finance'),
-          },
-        ]
-      : []),
   ]
 
   const pipelineMetrics = [
     {
       key: 'draft',
       label: t('bookings.status.draft'),
+      hint: t('bookings.statusHint.draft'),
       value: draftBookings,
-      className: 'border-amber-100 bg-amber-50 text-amber-700',
+      className: 'border-amber-100 bg-amber-50 text-amber-800',
     },
     {
       key: 'confirmed',
       label: t('bookings.status.confirmed'),
+      hint: t('bookings.statusHint.confirmed'),
       value: confirmedBookings,
-      className: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+      className: 'border-cyan-100 bg-cyan-50 text-cyan-800',
     },
     {
       key: 'active',
       label: t('bookings.status.in-progress'),
+      hint: t('bookings.statusHint.in-progress'),
       value: activeRentals,
-      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-800',
     },
     {
       key: 'completed',
       label: t('bookings.status.completed'),
+      hint: t('bookings.statusHint.completed'),
       value: completedBookings,
-      className: 'border-slate-200 bg-slate-50 text-slate-700',
+      className: 'border-slate-200 bg-slate-50 text-slate-800',
     },
   ]
 
@@ -366,237 +226,75 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <PageHero
-        eyebrow={t('dashboard.page.eyebrow')}
-        title={t('dashboard.page.title')}
-        description={t('dashboard.page.description')}
-        actions={
-          <>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/bookings/new')}
-              size={screens.md ? 'large' : 'middle'}
-              className="rounded-full px-5"
-            >
-              {t('bookings.page.create')}
-            </Button>
-            <Button
-              icon={<CarOutlined />}
-              onClick={() => navigate('/cars')}
-              size={screens.md ? 'large' : 'middle'}
-              className="rounded-full px-5"
-            >
-              {t('shell.menu.cars')}
-            </Button>
-            {isAdmin ? (
-              <Button
-                icon={<BankOutlined />}
-                onClick={() => navigate('/finance')}
-                size={screens.md ? 'large' : 'middle'}
-                className="rounded-full px-5"
-              >
-                {t('shell.menu.finance')}
-              </Button>
-            ) : null}
-          </>
-        }
-        extra={
-          <>
-            <Tag className="m-0 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-teal-700">
-              {t('dashboard.page.autoSyncTag')}
-            </Tag>
-            <Tag className="m-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">
-              {t('dashboard.page.operationsTag', { count: activeRentals })}
-            </Tag>
-          </>
-        }
-      />
+      <div className="flex justify-end">
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => navigate('/bookings/new')}
+          size={screens.md ? 'large' : 'middle'}
+          className="rounded-full px-5"
+        >
+          {t('bookings.page.create')}
+        </Button>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {primaryMetrics.map((metric) => (
-          <MetricCard key={metric.key} label={metric.label} value={metric.value} hint={metric.hint} icon={metric.icon} />
+        {todayMetrics.map((metric) => (
+          <MetricCard
+            key={metric.key}
+            label={metric.label}
+            value={metric.value}
+            hint={metric.hint}
+            icon={metric.icon}
+            onClick={metric.onClick}
+          />
         ))}
       </div>
 
-      <div className={`grid gap-4 ${secondaryMetrics.length === 4 ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'}`}>
-        {secondaryMetrics.map((metric) => (
-          <MetricCard key={metric.key} label={metric.label} value={metric.value} hint={metric.hint} icon={metric.icon} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {pipelineMetrics.map((metric) => (
+          <div key={metric.key} className={`rounded-[18px] border px-3.5 py-3 ${metric.className}`}>
+            <p className="mb-1 text-sm font-medium">{metric.label}</p>
+            <p className="mb-1 text-2xl font-semibold">{metric.value}</p>
+            <p className="mb-0 text-xs leading-4 opacity-80">{metric.hint}</p>
+          </div>
         ))}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <SectionCard
-          title={t('dashboard.sections.quickActionsTitle')}
-          description={t('dashboard.sections.quickActionsDescription')}
-        >
-          <div className="grid gap-3 p-3.5 sm:grid-cols-2 sm:p-4">
-            {quickActions.map((action) => (
-              <QuickActionCard
-                key={action.key}
-                title={action.title}
-                description={action.description}
-                icon={action.icon}
-                toneClass={action.toneClass}
-                onClick={action.onClick}
-              />
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title={t('dashboard.sections.pipelineTitle')}
-          description={t('dashboard.sections.pipelineDescription')}
-        >
-          <div className="grid gap-3 p-3.5 sm:grid-cols-2 sm:p-4">
-            {pipelineMetrics.map((metric) => (
-              <div key={metric.key} className={`rounded-[18px] border px-3.5 py-3 ${metric.className}`}>
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] opacity-80">{metric.label}</p>
-                <p className="mb-0 text-2xl font-semibold">{metric.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-slate-200/70 px-3.5 py-3.5 sm:px-4 sm:py-4">
-            <div className="rounded-[20px] bg-slate-50 px-3.5 py-3.5">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="mb-0 text-sm font-semibold text-slate-900">{t('dashboard.pipeline.collectionRate')}</p>
-                <span className="text-sm font-semibold text-teal-700">{collectionRate}%</span>
-              </div>
-              <Progress percent={collectionRate} showInfo={false} strokeColor="#0f766e" />
-              <p className="mb-0 mt-2 text-sm text-slate-600">
-                {t('dashboard.pipeline.collectionRateHint', { paidCount: paidBookings, totalCount: totalBookings })}
-              </p>
-            </div>
-          </div>
-        </SectionCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-        <div className="space-y-4">
-          <SectionCard
-            title={t('dashboard.sections.upcomingTitle')}
-            description={t('dashboard.sections.upcomingDescription')}
-            actions={
-              <Button type="text" onClick={() => navigate('/bookings')} className="rounded-full font-medium text-teal-700">
-                {t('shell.menu.bookings')}
-              </Button>
-            }
-          >
-            {upcomingBookings.length ? (
-              <div className="divide-y divide-slate-100">
-                {upcomingBookings.map((booking) => (
-                  <UpcomingBookingCard
-                    key={booking.id ?? booking.bookingCode}
-                    booking={booking}
-                    language={i18n.resolvedLanguage}
-                    onOpen={() => navigate(booking.id ? `/bookings/${booking.id}` : '/bookings')}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-8">
-                <Empty description={t('dashboard.upcoming.empty')} />
-              </div>
-            )}
-          </SectionCard>
-
-          {isAdmin ? (
-            <SectionCard
-              title={t('dashboard.sections.financeTitle')}
-              description={t('dashboard.sections.financeDescription')}
-            >
-              <div className="grid gap-3 p-3.5 sm:grid-cols-3 sm:p-4">
-                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    {t('dashboard.finance.collected')}
-                  </p>
-                  <p className="mb-0 text-lg font-semibold text-slate-900">
-                    {formatCurrencyVnd(totalCollected, i18n.resolvedLanguage)}
-                  </p>
-                </div>
-                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    {t('dashboard.finance.receivables')}
-                  </p>
-                  <p className="mb-0 text-lg font-semibold text-slate-900">
-                    {formatCurrencyVnd(outstandingBalance, i18n.resolvedLanguage)}
-                  </p>
-                </div>
-                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    {t('dashboard.metrics.teamMembers')}
-                  </p>
-                  <p className="mb-0 text-lg font-semibold text-slate-900">{teamCount}</p>
-                </div>
-              </div>
-            </SectionCard>
-          ) : null}
-        </div>
-
-        <div className="space-y-4">
-          <SectionCard
-            title={t('dashboard.sections.prioritiesTitle')}
-            description={t('dashboard.sections.prioritiesDescription')}
-          >
-            <div className="space-y-3 p-3.5 sm:p-4">
-              {overdueCount > 0 ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message={t('dashboard.priorities.overdueTitle', { count: overdueCount })}
-                  description={t('dashboard.priorities.overdueDescription')}
-                  action={
-                    <Button type="link" onClick={() => navigate('/bookings')}>
-                      {t('shell.menu.bookings')}
-                    </Button>
-                  }
+        <SectionCard
+          title={t('dashboard.sections.upcomingTitle')}
+          actions={
+            <Button type="text" onClick={() => navigate('/bookings')} className="rounded-full font-medium text-teal-700">
+              {t('shell.menu.bookings')}
+            </Button>
+          }
+        >
+          {upcomingBookings.length ? (
+            <div className="divide-y divide-slate-100">
+              {upcomingBookings.map((booking) => (
+                <UpcomingBookingCard
+                  key={booking.id ?? booking.bookingCode}
+                  booking={booking}
+                  language={i18n.resolvedLanguage}
+                  onOpen={() => navigate(booking.id ? `/bookings/${booking.id}` : '/bookings')}
                 />
-              ) : null}
-
-              {pendingCollectionsCount > 0 ? (
-                <Alert
-                  type="info"
-                  showIcon
-                  message={t('dashboard.priorities.collectionsTitle', { count: pendingCollectionsCount })}
-                  description={t('dashboard.priorities.collectionsDescription')}
-                  action={
-                    <Button type="link" onClick={() => navigate('/bookings')}>
-                      {t('dashboard.priorities.collectionsAction')}
-                    </Button>
-                  }
-                />
-              ) : null}
-
-              {inServiceCars > 0 ? (
-                <Alert
-                  type="error"
-                  showIcon
-                  message={t('dashboard.priorities.serviceTitle', { count: inServiceCars })}
-                  description={t('dashboard.priorities.serviceDescription')}
-                  action={
-                    <Button type="link" onClick={() => navigate('/cars')}>
-                      {t('dashboard.priorities.serviceAction')}
-                    </Button>
-                  }
-                />
-              ) : null}
-
-              {overdueCount === 0 && pendingCollectionsCount === 0 && inServiceCars === 0 ? (
-                <Alert
-                  type="success"
-                  showIcon
-                  message={t('dashboard.priorities.clearTitle')}
-                  description={t('dashboard.priorities.clearDescription')}
-                />
-              ) : null}
+              ))}
             </div>
-          </SectionCard>
+          ) : (
+            <div className="px-4 py-8">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <EmptyCopy title={t('dashboard.upcoming.empty')} hint={t('dashboard.upcoming.emptyHint')} />
+                }
+              />
+            </div>
+          )}
+        </SectionCard>
 
-          <SectionCard
-            title={t('dashboard.sections.fleetTitle')}
-            description={t('dashboard.sections.fleetDescription', { rate: utilizationRate })}
-          >
+        <div className="space-y-4">
+          <SectionCard title={t('dashboard.sections.fleetTitle')} description={t('dashboard.sections.fleetDescription', { rate: utilizationRate })}>
             <div className="space-y-4 p-3.5 sm:p-4">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
@@ -631,6 +329,45 @@ export function DashboardPage() {
               </div>
             </div>
           </SectionCard>
+
+          {isAdmin ? (
+            <SectionCard title={t('dashboard.sections.financeTitle')}>
+              <div className="grid gap-3 p-3.5 sm:grid-cols-3 sm:p-4">
+                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
+                  <p className="mb-1 text-sm text-slate-500">{t('dashboard.finance.collected')}</p>
+                  <p className="mb-0 text-lg font-semibold text-slate-900">
+                    <MoneyText value={totalCollected} language={i18n.resolvedLanguage} />
+                  </p>
+                </div>
+                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
+                  <p className="mb-1 text-sm text-slate-500">{t('dashboard.finance.receivables')}</p>
+                  <p className="mb-0 text-lg font-semibold text-slate-900">
+                    <MoneyText value={outstandingBalance} language={i18n.resolvedLanguage} />
+                  </p>
+                </div>
+                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
+                  <p className="mb-1 text-sm text-slate-500">{t('dashboard.pipeline.collectionRate')}</p>
+                  <p className="mb-0 text-lg font-semibold text-slate-900">{collectionRate}%</p>
+                  <p className="mb-0 mt-1 text-xs text-slate-500">
+                    {t('dashboard.pipeline.collectionRateHint', { paidCount: paidBookings, totalCount: totalBookings })}
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          ) : (
+            <SectionCard title={t('dashboard.metrics.customers')}>
+              <div className="grid gap-3 p-3.5 sm:grid-cols-2 sm:p-4">
+                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
+                  <p className="mb-1 text-sm text-slate-500">{t('dashboard.metrics.customers')}</p>
+                  <p className="mb-0 text-lg font-semibold text-slate-900">{customerCount}</p>
+                </div>
+                <div className="rounded-[20px] bg-slate-50 px-3.5 py-3">
+                  <p className="mb-1 text-sm text-slate-500">{t('dashboard.metrics.teamMembers')}</p>
+                  <p className="mb-0 text-lg font-semibold text-slate-900">{teamCount}</p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
         </div>
       </div>
     </div>

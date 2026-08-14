@@ -4,6 +4,8 @@ import { Button, Calendar, Empty, Grid, Spin, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { Booking, BookingStatus } from '../../types/Booking'
+import { toDate } from '../../utils/date'
+import { EmptyCopy } from '../ui/EmptyCopy'
 
 interface BookingCalendarProps {
   bookings: Booking[]
@@ -17,23 +19,6 @@ const statusColors: Record<BookingStatus, string> = {
   'in-progress': 'blue',
   completed: 'purple',
   canceled: 'red',
-}
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
 }
 
 function getBookingsForDay(bookings: Booking[], dateValue: Dayjs) {
@@ -94,7 +79,7 @@ export function BookingCalendar({ bookings, isLoading, onBookingSelect }: Bookin
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         className="py-10"
-        description={t('bookings.calendar.empty')}
+        description={<EmptyCopy title={t('bookings.calendar.empty')} hint={t('bookings.list.emptyHint')} />}
       />
     )
   }

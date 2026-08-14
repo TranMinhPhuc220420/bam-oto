@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Typography, message } from 'antd'
+import { Button, Form, Input, Typography, message } from 'antd'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -6,6 +6,13 @@ import { Link } from 'react-router-dom'
 import { AuthPageShell } from '../components/auth/AuthPageShell'
 import { useAuth } from '../hooks/useAuth'
 import { getFirebaseAuthErrorMessage } from '../services/firebase'
+import {
+  emailRule,
+  formScrollToFirstError,
+  formValidateTrigger,
+  normalizeEmail,
+  requiredTrimmed,
+} from '../utils/validation'
 
 interface ForgotPasswordFormValues {
   email: string
@@ -21,7 +28,7 @@ export function ForgotPasswordPage() {
   async function handleSubmit(values: ForgotPasswordFormValues) {
     try {
       setIsSubmitting(true)
-      await resetPassword(values.email)
+      await resetPassword(normalizeEmail(values.email))
       messageApi.success(t('auth.forgotPassword.success'))
       form.resetFields()
     } catch (error) {
@@ -38,20 +45,18 @@ export function ForgotPasswordPage() {
         title={t('auth.forgotPassword.title')}
         subtitle={t('auth.forgotPassword.subtitle')}
       >
-        <Alert
-          className="mb-6 rounded-2xl"
-          type="info"
-          showIcon
-          message={t('auth.forgotPassword.info')}
-        />
-        <Form form={form} layout="vertical" onFinish={handleSubmit} size="large">
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          size="large"
+          validateTrigger={[...formValidateTrigger]}
+          scrollToFirstError={formScrollToFirstError}
+        >
           <Form.Item
             label={t('auth.forgotPassword.email')}
             name="email"
-            rules={[
-              { required: true, message: t('auth.validation.emailRequired') },
-              { type: 'email', message: t('auth.validation.emailInvalid') },
-            ]}
+            rules={[requiredTrimmed(t('auth.validation.emailRequired')), emailRule(t('auth.validation.emailInvalid'))]}
           >
             <Input placeholder={t('auth.forgotPassword.emailPlaceholder')} />
           </Form.Item>

@@ -1,30 +1,86 @@
-import { EditOutlined } from '@ant-design/icons'
-import { Button, Empty, Grid, Skeleton, Space, Table, Tag, Typography } from 'antd'
+import type { MouseEvent } from 'react'
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Empty, Grid, Popconfirm, Skeleton, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 
+import type { CatalogDeleteEligibilityResult } from '../../services/carCatalog'
 import { CarBrand } from '../../types/Brand'
+import { EmptyCopy } from '../ui/EmptyCopy'
 
 interface BrandListProps {
   brands: CarBrand[]
   loading: boolean
   onEdit: (brand: CarBrand) => void
+  onDelete?: (brand: CarBrand) => void
+  deletingId?: string | null
+  getDeleteState?: (brand: CarBrand) => CatalogDeleteEligibilityResult
   selectedBrandId?: string
   onSelectBrand?: (brand: CarBrand) => void
 }
 
 const { Text } = Typography
 
+function stopRowClick(event: MouseEvent) {
+  event.stopPropagation()
+}
+
 export function BrandList({
   brands,
   loading,
   onEdit,
+  onDelete,
+  deletingId,
+  getDeleteState,
   selectedBrandId,
   onSelectBrand,
 }: BrandListProps) {
   const { t } = useTranslation()
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
+
+  const renderDeleteControl = (brand: CarBrand) => {
+    if (!onDelete) {
+      return null
+    }
+
+    const deleteState = getDeleteState?.(brand) ?? { allowed: true }
+    const button = (
+      <Button
+        icon={<DeleteOutlined />}
+        size="small"
+        danger
+        shape="circle"
+        disabled={!deleteState.allowed}
+        loading={Boolean(brand.id && deletingId === brand.id)}
+        aria-label={t('common.actions.delete')}
+        onClick={stopRowClick}
+      />
+    )
+
+    if (!deleteState.allowed) {
+      return (
+        <Tooltip title={t(deleteState.reasonKey ?? 'brands.messages.deleteError')}>
+          <span onClick={stopRowClick}>{button}</span>
+        </Tooltip>
+      )
+    }
+
+    return (
+      <span onClick={stopRowClick}>
+        <Popconfirm
+          title={t('brands.messages.deleteTitle')}
+          description={t('brands.messages.deleteDescription', { name: brand.name })}
+          onConfirm={() => onDelete(brand)}
+          okText={t('common.actions.delete')}
+          cancelText={t('common.actions.cancel')}
+          okButtonProps={{ danger: true }}
+        >
+          {button}
+        </Popconfirm>
+      </span>
+    )
+  }
 
   const columns: ColumnsType<CarBrand> = [
     {
@@ -56,10 +112,20 @@ export function BrandList({
       key: 'action',
       align: 'right',
       render: (_, record) => (
-        <Space>
-          <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
-            {t('common.actions.edit')}
-          </Button>
+        <Space size="small" onClick={stopRowClick}>
+          <Tooltip title={t('common.actions.edit')}>
+            <Button
+              icon={<EditOutlined />}
+              size="small"
+              shape="circle"
+              aria-label={t('common.actions.edit')}
+              onClick={(event) => {
+                stopRowClick(event)
+                onEdit(record)
+              }}
+            />
+          </Tooltip>
+          {renderDeleteControl(record)}
         </Space>
       ),
     },
@@ -84,7 +150,7 @@ export function BrandList({
     if (!brands.length) {
       return (
         <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('brands.list.empty')} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<EmptyCopy title={t('brands.list.empty')} hint={t('brands.list.emptyHint')} />} />
         </div>
       )
     }
@@ -115,15 +181,18 @@ export function BrandList({
                   <p className="mb-0 mt-1 text-sm leading-5 text-slate-500">{t('brands.list.helper')}</p>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <Tag color={isActive ? 'green' : 'default'} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                    {isActive ? t('common.states.active') : t('common.states.inactive')}
-                  </Tag>
-                  {isSelected ? (
-                    <Tag color="cyan" className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                      {t('common.states.selected')}
+                <div className="flex shrink-0 items-start gap-2">
+                  <div className="flex flex-col items-end gap-1">
+                    <Tag color={isActive ? 'green' : 'default'} className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                      {isActive ? t('common.states.active') : t('common.states.inactive')}
                     </Tag>
-                  ) : null}
+                    {isSelected ? (
+                      <Tag color="cyan" className="m-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                        {t('common.states.selected')}
+                      </Tag>
+                    ) : null}
+                  </div>
+                  {renderDeleteControl(brand)}
                 </div>
               </div>
 
@@ -171,7 +240,7 @@ export function BrandList({
         emptyText: (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={t('brands.list.empty')}
+            description={<EmptyCopy title={t('brands.list.empty')} hint={t('brands.list.emptyHint')} />}
           />
         ),
       }}

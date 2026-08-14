@@ -8,7 +8,8 @@ import { useBookingTransactions } from '../../hooks/useBookingTransactions'
 import { getBookingAdjustmentItems, getBookingExtraChargeItems } from '../../services/bookingService'
 import { Booking } from '../../types/Booking'
 import { Transaction } from '../../types/Transaction'
-import { formatCurrencyVnd } from '../../utils/currency'
+import { toDate } from '../../utils/date'
+import { MoneyText } from '../ui/MoneyText'
 
 interface BookingTransactionListProps {
   bookingId?: string
@@ -31,23 +32,6 @@ const statusColors: Record<Transaction['status'], string> = {
   partial: 'cyan',
   paid: 'green',
   refunded: 'volcano',
-}
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
 }
 
 export function BookingTransactionList({ bookingId, booking }: BookingTransactionListProps) {
@@ -149,13 +133,15 @@ export function BookingTransactionList({ bookingId, booking }: BookingTransactio
       align: 'right',
       width: 180,
       render: (value: number, row) => (
-        <div className="flex items-center justify-end gap-2 font-semibold text-slate-900">
+        <div className="flex min-w-0 items-center justify-end gap-2 font-semibold text-slate-900">
           {row.direction === 'incoming' ? (
             <ArrowDownOutlined className="text-emerald-600" />
           ) : (
             <ArrowUpOutlined className="text-rose-500" />
           )}
-          <span>{formatCurrencyVnd(value ?? 0, i18n.resolvedLanguage)}</span>
+          <span className="min-w-0">
+            <MoneyText value={value ?? 0} language={i18n.resolvedLanguage} />
+          </span>
         </div>
       ),
     },

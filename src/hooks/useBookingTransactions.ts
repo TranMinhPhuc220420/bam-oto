@@ -3,23 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 
 import { db } from '../services/firebase'
 import { Transaction } from '../types/Transaction'
-
-function toMillis(value: unknown) {
-  if (value instanceof Date) {
-    return value.getTime()
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate().getTime()
-  }
-
-  return 0
-}
+import { toMillis } from '../utils/date'
 
 export function useBookingTransactions(bookingId?: string) {
   const [transactions, setTransactions] = useState<Transaction[]>([])

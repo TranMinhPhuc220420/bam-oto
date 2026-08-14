@@ -17,9 +17,12 @@ import { ModelForm, type ModelFormValues } from '../../components/models/ModelFo
 import { ModelList } from '../../components/models/ModelList'
 import { MetricCard } from '../../components/ui/MetricCard'
 import { SectionCard } from '../../components/ui/SectionCard'
+import { useAuth } from '../../hooks/useAuth'
 import { useCarBrands } from '../../hooks/useCarBrands'
 import { useCarModels } from '../../hooks/useCarModels'
+import { useCars } from '../../hooks/useCars'
 import { db } from '../../services/firebase'
+import { canDeleteCarModel, deleteCarModelWithGuards } from '../../services/carCatalog'
 import { CarBrand } from '../../types/Brand'
 import { CarModel } from '../../types/Model'
 
@@ -31,7 +34,10 @@ export function CarModelsPage() {
   const screens = Grid.useBreakpoint()
   const { brands, loading: brandsLoading } = useCarBrands({ includeInactive: true })
   const { models, loading: modelsLoading } = useCarModels(undefined, { includeInactive: true })
+  const { cars } = useCars()
+  const { profile } = useAuth()
   const [saving, setSaving] = useState(false)
+  const [deletingModelId, setDeletingModelId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingModel, setEditingModel] = useState<CarModel | null>(null)
   const { t } = useTranslation()
@@ -72,6 +78,42 @@ export function CarModelsPage() {
   const closeModal = () => {
     setEditingModel(null)
     setIsModalOpen(false)
+  }
+
+  const getModelDeleteState = (model: CarModel) =>
+    canDeleteCarModel(model, cars, {
+      role: profile?.role ?? null,
+      brand: brands.find((brand) => brand.id === model.brandId) ?? null,
+    })
+
+  const handleDelete = async (model: CarModel) => {
+    const deleteState = getModelDeleteState(model)
+
+    if (!deleteState.allowed) {
+      message.warning(t(deleteState.reasonKey ?? 'models.messages.deleteError'))
+      return
+    }
+
+    setDeletingModelId(model.id ?? null)
+
+    try {
+      const result = await deleteCarModelWithGuards(model, {
+        role: profile?.role ?? null,
+        brand: brands.find((brand) => brand.id === model.brandId) ?? null,
+      })
+
+      if (!result.allowed) {
+        message.warning(t(result.reasonKey ?? 'models.messages.deleteError'))
+        return
+      }
+
+      message.success(t('models.messages.deleteSuccess'))
+    } catch (error) {
+      console.error('Error deleting car model:', error)
+      message.error(t('models.messages.deleteError'))
+    } finally {
+      setDeletingModelId(null)
+    }
   }
 
   const handleSubmit = async (values: ModelFormValues) => {
@@ -189,7 +231,15 @@ export function CarModelsPage() {
           </Button>
         }
       >
-        <ModelList models={models} brandNames={brandNames} loading={loading} onEdit={openEditModal} />
+        <ModelList
+          models={models}
+          brandNames={brandNames}
+          loading={loading}
+          onEdit={openEditModal}
+          onDelete={handleDelete}
+          deletingId={deletingModelId}
+          getDeleteState={getModelDeleteState}
+        />
       </SectionCard>
 
       <Modal

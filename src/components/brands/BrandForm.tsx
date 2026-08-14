@@ -3,6 +3,7 @@ import { Button, Form, Input, Switch } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { CarBrand } from '../../types/Brand'
+import { formScrollToFirstError, formValidateTrigger, minTrimmedLength } from '../../utils/validation'
 
 export interface BrandFormValues {
   name: string
@@ -33,12 +34,14 @@ export function BrandForm({ initialValues, onSubmit, isLoading = false }: BrandF
       form={form}
       layout="vertical"
       initialValues={{ isActive: true, ...initialValues }}
+      validateTrigger={[...formValidateTrigger]}
+      scrollToFirstError={formScrollToFirstError}
       onFinish={(values) => onSubmit({ ...values, name: values.name.trim() })}
     >
       <Form.Item
         name="name"
         label={t('brands.form.name')}
-        rules={[{ required: true, message: t('brands.form.required') }]}
+        rules={[minTrimmedLength(2, t('brands.form.minLength'))]}
       >
         <Input placeholder={t('brands.form.placeholder')} />
       </Form.Item>

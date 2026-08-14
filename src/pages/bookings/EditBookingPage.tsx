@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LeftOutlined } from '@ant-design/icons'
-import { App, Button, Card, Grid, Spin, Typography } from 'antd'
+import { App, Button, Card, Grid, Spin } from 'antd'
 import { deleteField, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -16,8 +16,6 @@ import {
 } from '../../services/bookingService'
 import { db } from '../../services/firebase'
 import { Booking } from '../../types/Booking'
-
-const { Title } = Typography
 
 export function EditBookingPage() {
   const { id } = useParams<{ id: string }>()
@@ -179,9 +177,6 @@ export function EditBookingPage() {
         <Button icon={<LeftOutlined />} type="text" onClick={() => navigate('/bookings')}>
           {!isMobile && t('bookings.edit.back')}
         </Button>
-        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
-          {t('bookings.edit.title')}
-        </Title>
       </div>
 
       <Card className="rounded-[28px] border-0 p-4 shadow-sm">

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { LeftOutlined } from '@ant-design/icons'
-import { App, Button, Card, Grid, Typography } from 'antd'
+import { App, Button, Card, Grid } from 'antd'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -14,8 +14,6 @@ import {
   syncBookingTransaction,
   syncCarStatusWithBookings,
 } from '../../services/bookingService'
-
-const { Title } = Typography
 
 export function NewBookingPage() {
   const navigate = useNavigate()
@@ -88,9 +86,6 @@ export function NewBookingPage() {
         <Button icon={<LeftOutlined />} type="text" onClick={() => navigate('/bookings')}>
           {!isMobile && t('bookings.create.back')}
         </Button>
-        <Title level={isMobile ? 4 : 2} className="!mb-0 !mt-0 text-slate-900">
-          {t('bookings.create.title')}
-        </Title>
       </div>
 
       <Card className="rounded-[28px] border-0 p-4 shadow-sm">

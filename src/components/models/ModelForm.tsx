@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { BrandSelector } from '../cars/BrandSelector'
 import { CarModel } from '../../types/Model'
+import { formScrollToFirstError, formValidateTrigger, minTrimmedLength } from '../../utils/validation'
 
 export interface ModelFormValues {
   brandId: string
@@ -36,6 +37,8 @@ export function ModelForm({ initialValues, onSubmit, isLoading = false }: ModelF
       form={form}
       layout="vertical"
       initialValues={{ isActive: true, ...initialValues }}
+      validateTrigger={[...formValidateTrigger]}
+      scrollToFirstError={formScrollToFirstError}
       onFinish={(values) => onSubmit({ ...values, name: values.name.trim() })}
     >
       <Form.Item
@@ -49,7 +52,7 @@ export function ModelForm({ initialValues, onSubmit, isLoading = false }: ModelF
       <Form.Item
         name="name"
         label={t('models.form.name')}
-        rules={[{ required: true, message: t('models.form.nameRequired') }]}
+        rules={[minTrimmedLength(2, t('models.form.minLength'))]}
       >
         <Input placeholder={t('models.form.placeholder')} />
       </Form.Item>

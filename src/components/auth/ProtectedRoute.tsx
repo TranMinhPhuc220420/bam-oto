@@ -1,4 +1,5 @@
 import { Alert, Button, Result, Spin } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
@@ -10,6 +11,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
   const { currentUser, loading, profile, signOut } = useAuth()
   const location = useLocation()
+  const { t } = useTranslation()
 
   if (loading) {
     return (
@@ -28,8 +30,8 @@ export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
       <div className="flex min-h-screen items-center justify-center p-6">
         <Alert
           className="max-w-xl"
-          title="Missing user profile"
-          description="A Firestore user document was not found for this account. Create users/{authUid} with role and isActive fields before granting access."
+          title={t('auth.protected.missingProfile.title')}
+          description={t('auth.protected.missingProfile.description')}
           type="warning"
           showIcon
         />
@@ -42,11 +44,11 @@ export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
       <div className="flex min-h-screen items-center justify-center p-6">
         <Result
           status="403"
-          title="Account disabled"
-          subTitle="This account is inactive. Contact an administrator to restore access."
+          title={t('auth.protected.disabled.title')}
+          subTitle={t('auth.protected.disabled.subtitle')}
           extra={
             <Button type="primary" onClick={() => void signOut()}>
-              Sign out
+              {t('common.actions.signOut')}
             </Button>
           }
         />

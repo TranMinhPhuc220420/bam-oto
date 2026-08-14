@@ -1,36 +1,37 @@
 # 05 - Customer Management
 
 ## Purpose
-Manage customer profiles and their rental history for the self‑drive car rental business.
+Manage customer profiles and their rental history for the self-drive car rental business.
 
 ## Scope
-- CRUD for customers.
-- Upload and store license / ID images.
-- Link customers to bookings.
+- CRUD for customers (create, view, update, soft-deactivate).
+- Link customers to bookings and show rental history.
+- Prevent duplicate phone numbers.
 
 ## Requirements
 - Firestore:
   - Collection: `customers`.
-  - Sample document:
-    - `name`, `phone`, `email`.
-    - `licenseNumber`, `licenseExpiry`.
-    - `licenseImageRef` (URL from Supabase).
-    - `createdAt`, `updatedAt`.
-- Supabase Storage:
-  - Bucket: `customer-documents`.
-  - Store license images and ID scans.
+  - Document fields:
+    - `fullName`, `phoneNumber`, `email`.
+    - `governmentId`, `driverLicenseNumber`, `notes`.
+    - `isActive`, `createdAt`, `updatedAt`.
 - Frontend:
   - Pages:
     - `/customers` (list).
     - `/customers/new`, `/customers/:id`.
   - Components:
-    - `CustomerList`, `CustomerForm`, `LicenseUpload`.
-  - Ant Design Form, Upload, Input + Tailwind CSS.
+    - `CustomerList`, `CustomerForm`.
+  - Ant Design Form, Table, Input + Tailwind CSS.
 - Validation:
-  - Prevent duplicate license numbers if business policy requires it.
-  - Show customer history (e.g., list of past bookings).
+  - Prevent duplicate phone numbers.
+  - Show customer booking history on the detail page.
 - Workflow:
-  - When creating a customer, upload license image to Supabase → store URL in `licenseImageRef`.
+  - Creating a booking with a new phone number still creates a customer inline.
+  - Creating a booking with an existing phone number reuses that customer.
+
+## Out of scope
+- License / ID image upload.
+- Supabase `customer-documents` bucket.
 
 ## Output
 Write the full markdown spec only; do not add extra explanations outside the spec.

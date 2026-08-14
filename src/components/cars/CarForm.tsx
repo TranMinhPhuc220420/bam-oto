@@ -14,6 +14,12 @@ import { normalizeCarPlateNumber } from '../../services/carService';
 import { Car } from '../../types/Car';
 import { CarBrand } from '../../types/Brand';
 import { CarModel } from '../../types/Model';
+import {
+  formScrollToFirstError,
+  formValidateTrigger,
+  requiredTrimmed,
+  vnPlateRule,
+} from '../../utils/validation';
 
 interface CarFormProps {
   initialValues?: Partial<Car>;
@@ -126,7 +132,7 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
     onSubmit({
       ...values,
       plateNumber:
-        typeof values.plateNumber === 'string' ? values.plateNumber.trim().toUpperCase() : values.plateNumber,
+        typeof values.plateNumber === 'string' ? normalizeCarPlateNumber(values.plateNumber) : values.plateNumber,
     });
   };
 
@@ -170,13 +176,16 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
         form={form}
         layout="vertical"
         onFinish={onFinish}
+        validateTrigger={[...formValidateTrigger]}
+        scrollToFirstError={formScrollToFirstError}
         initialValues={{ everRented: false, status: 'available', images: [], note: '', ...initialValues }}
       >
         <Form.Item
           name="plateNumber"
           label={t('cars.form.plateNumber')}
+          validateFirst
           rules={[
-            { required: true, message: t('cars.form.validation.plateNumber') },
+            vnPlateRule(t('cars.form.validation.plateNumber'), t('common.validation.plateFormat')),
             {
               validator: async (_, value: string | undefined) => {
                 const normalizedValue = normalizeCarPlateNumber(value);
@@ -213,7 +222,7 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
           <Input />
         </Form.Item>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
             name="brandId"
             label={t('cars.form.brand')}
@@ -233,7 +242,7 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
           </Form.Item>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
             name="fuelType"
             label={t('cars.form.fuelType')}
@@ -248,13 +257,13 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
           <Form.Item
             name="color"
             label={t('cars.form.color')}
-            rules={[{ required: true, message: t('cars.form.validation.color') }]}
+            rules={[requiredTrimmed(t('cars.form.validation.color'))]}
           >
             <Input placeholder={t('cars.form.colorPlaceholder')} />
           </Form.Item>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
             name="year"
             label={t('cars.form.year')}
@@ -298,7 +307,7 @@ export const CarForm: React.FC<CarFormProps> = ({ initialValues, onSubmit, isLoa
         )}
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={isLoading}>
+          <Button type="primary" htmlType="submit" loading={isLoading} className="rounded-full px-6">
             {initialValues ? t('cars.form.submitUpdate') : t('cars.form.submitCreate')}
           </Button>
         </Form.Item>

@@ -13,10 +13,8 @@ Implement a secure authentication layer for the self-drive car rental web app us
 ## Routes
 - `/login`: Public sign-in page.
 - `/forgot-password`: Public password reset page.
-- `/cars`: Protected route for authenticated users.
-- `/bookings`: Protected route for authenticated users.
-- `/finance`: Protected route for authenticated users.
-- `/register`: Protected route for authenticated admin users only.
+- `/dashboard`, `/cars`, `/bookings`, `/customers`: Protected routes for authenticated users.
+- `/finance`, `/users`, `/users/new`, `/cars/new`, `/cars/edit/:id`, `/cars/catalog`: Protected routes for authenticated admin users only.
 
 ## Environment Variables
 The app reads Firebase settings from Vite environment variables.
@@ -35,7 +33,7 @@ VITE_FIREBASE_MEASUREMENT_ID=
 - `AuthProvider`: Watches Firebase Auth state and loads `users/{authUid}` from Firestore.
 - `useAuth`: Exposes `currentUser`, `profile`, `loading`, `signIn`, `signUp`, `signOut`, and `resetPassword`.
 - `ProtectedRoute`: Redirects unauthenticated users to `/login`, blocks inactive accounts, and optionally requires the `admin` role.
-- `PublicOnlyRoute`: Redirects authenticated users away from public auth pages to `/cars`.
+- `PublicOnlyRoute`: Redirects authenticated users away from public auth pages to `/dashboard`.
 - `AppShell`: Shared authenticated layout with sidebar navigation and sign-out action.
 
 ## Firestore Structure
@@ -55,13 +53,21 @@ Document fields:
 ## Authentication Flows
 ### Sign in
 - User opens `/login`.
-- Successful sign-in redirects to `/cars`.
+- Successful sign-in redirects to `/dashboard`.
 - If the user originally requested a protected route, the app redirects back to that route.
 
 ### Register user
-- Only authenticated users with `role: admin` can access `/register`.
+- Only authenticated users with `role: admin` can access `/users/new`.
 - Registration uses a secondary Firebase app instance so the current admin session is not replaced.
 - The flow creates a Firebase Auth user, writes `users/{authUid}`, and requests an email verification message.
+
+### Delete user
+- Only authenticated users with `role: admin` can access `/users` and delete accounts.
+- Delete removes the `users/{authUid}` Firestore document so the person can no longer use the app.
+- Spark (free) Firebase cannot delete another Auth account from the client. To reuse the email, delete the user in Firebase Console → Authentication → Users.
+- An admin cannot delete their own account or the last remaining administrator.
+- Deactivate (`isActive: false`) remains available for a temporary lockout.
+- Related bookings, customers, and cars are kept.
 
 ### Password reset
 - `/forgot-password` sends a Firebase Auth reset email.
@@ -74,12 +80,13 @@ Document fields:
 ## Implementation Notes
 - The initial administrator account still needs a matching Firestore document created manually or by a bootstrap script.
 - Email verification is requested on account creation and shown in the authenticated UI as a pending status when not yet completed.
-- Placeholder pages for cars, bookings, and finance are included so route protection can be tested immediately.
+- Firestore security rules live in `firestore.rules` and must be deployed with the Firebase CLI. See `docs/00-firestore-security.md`.
 
 ## Acceptance Criteria
 - Users can sign in with Firebase email/password on `/login`.
-- Admin users can create new users from `/register` without losing their own session.
+- Admin users can create new users from `/users/new` without losing their own session.
 - Password reset works from `/forgot-password`.
 - `/cars`, `/bookings`, and `/finance` redirect to `/login` when there is no authenticated user.
-- `/register` is only accessible to authenticated admin users.
+- `/users/new` is only accessible to authenticated admin users.
+- Admin users can remove other users from `/users`, except themselves and the last administrator. Auth accounts must be deleted in Firebase Console to reuse an email.
 - Firebase configuration is loaded only from environment variables.

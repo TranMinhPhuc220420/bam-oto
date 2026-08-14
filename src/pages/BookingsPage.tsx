@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons'
 import { App, Button, Segmented, Grid } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { BookingCalendar } from '../components/bookings/BookingCalendar'
 import { BookingDetailDrawer } from '../components/bookings/BookingDetailDrawer'
@@ -22,23 +22,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useBookings } from '../hooks/useBookings'
 import { deleteBookingWithGuards } from '../services/bookingService'
 import type { Booking, BookingStatus, PaymentStatus } from '../types/Booking'
-
-function toDate(value: unknown) {
-  if (value instanceof Date) {
-    return value
-  }
-
-  if (
-    value &&
-    typeof value === 'object' &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate()
-  }
-
-  return null
-}
+import { toDate } from '../utils/date'
 
 function isOverdueBooking(booking: Booking) {
   const endDate = toDate(booking.endDate)
@@ -54,12 +38,21 @@ export function BookingsPage() {
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
   const { bookings, loading } = useBookings()
+  const [searchParams] = useSearchParams()
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all')
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'all'>('all')
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [quickFilter, setQuickFilter] = useState<BookingQuickFilter>('all')
+
+  useEffect(() => {
+    const scope = searchParams.get('scope')
+
+    if (scope === 'today' || scope === 'upcoming' || scope === 'active' || scope === 'overdue' || scope === 'all') {
+      setQuickFilter(scope)
+    }
+  }, [searchParams])
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [deletingBookingId, setDeletingBookingId] = useState<string | null>(null)
 

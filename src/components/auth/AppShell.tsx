@@ -1,7 +1,5 @@
 import {
-  Alert,
   Avatar,
-  Breadcrumb,
   Button,
   Drawer,
   Grid,
@@ -18,9 +16,9 @@ import {
   DashboardOutlined,
   LogoutOutlined,
   MenuOutlined,
-  PlusOutlined,
   TagsOutlined,
   TeamOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -28,10 +26,9 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
+import logo from '../../assets/logo.png'
 
 const { Header, Content, Sider } = Layout
-
-const publicDomain = import.meta.env.VITE_PUBLIC_DOMAIN ?? 'bam.plt.pro.vn'
 
 type RouteKey =
   | 'dashboard'
@@ -43,6 +40,9 @@ type RouteKey =
   | 'newBooking'
   | 'editBooking'
   | 'bookingDetail'
+  | 'customers'
+  | 'newCustomer'
+  | 'customerDetail'
   | 'finance'
   | 'newUser'
   | 'users'
@@ -62,12 +62,27 @@ const routeMeta: RouteMeta[] = [
   { path: '/bookings/edit', key: 'editBooking' },
   { path: '/bookings/', key: 'bookingDetail' },
   { path: '/bookings', key: 'bookings' },
+  { path: '/customers/new', key: 'newCustomer' },
+  { path: '/customers/', key: 'customerDetail' },
+  { path: '/customers', key: 'customers' },
   { path: '/finance', key: 'finance' },
   { path: '/users/new', key: 'newUser' },
   { path: '/users', key: 'users' },
 ]
 
-import logo from '../../assets/logo.png'
+function collectMenuKeys(items: MenuProps['items']): string[] {
+  return (items ?? []).flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return []
+    }
+
+    if ('children' in item && Array.isArray(item.children)) {
+      return collectMenuKeys(item.children as MenuProps['items'])
+    }
+
+    return typeof item.key === 'string' ? [item.key] : []
+  })
+}
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -78,26 +93,52 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const activeLanguage = i18n.resolvedLanguage?.startsWith('vi') ? 'vi' : 'en'
   const isCompactHeader = !screens.md
-  const isMobile = screens.md === false;
+  const isMobile = screens.md === false
+  const isAdmin = profile?.role === 'admin'
 
   const items: MenuProps['items'] = useMemo(() => {
-    const baseItems: MenuProps['items'] = [
+    const operations: MenuProps['items'] = [
       { key: '/dashboard', icon: <DashboardOutlined />, label: t('shell.menu.dashboard') },
       { key: '/bookings', icon: <CalendarOutlined />, label: t('shell.menu.bookings') },
+      { key: '/customers', icon: <UserOutlined />, label: t('shell.menu.customers') },
+    ]
+
+    const fleet: MenuProps['items'] = [
       { key: '/cars', icon: <CarOutlined />, label: t('shell.menu.cars') },
     ]
 
-    if (profile?.role === 'admin') {
-      baseItems.push({ key: '/cars/catalog', icon: <TagsOutlined />, label: t('shell.menu.catalog') })
-      baseItems.push({ key: '/finance', icon: <BankOutlined />, label: t('shell.menu.finance') })
-      baseItems.push({ key: '/users', icon: <TeamOutlined />, label: t('shell.menu.users') })
+    if (isAdmin) {
+      fleet.push({ key: '/cars/catalog', icon: <TagsOutlined />, label: t('shell.menu.catalog') })
     }
 
-    return baseItems
-  }, [profile?.role, t])
+    const groups: MenuProps['items'] = [
+      {
+        type: 'group',
+        label: t('shell.menu.groups.operations'),
+        children: operations,
+      },
+      {
+        type: 'group',
+        label: t('shell.menu.groups.fleet'),
+        children: fleet,
+      },
+    ]
 
-  const selectedKey = items
-    .map((item) => (typeof item?.key === 'string' ? item.key : ''))
+    if (isAdmin) {
+      groups.push({
+        type: 'group',
+        label: t('shell.menu.groups.admin'),
+        children: [
+          { key: '/finance', icon: <BankOutlined />, label: t('shell.menu.finance') },
+          { key: '/users', icon: <TeamOutlined />, label: t('shell.menu.users') },
+        ],
+      })
+    }
+
+    return groups
+  }, [isAdmin, t])
+
+  const selectedKey = collectMenuKeys(items)
     .sort((left, right) => right.length - left.length)
     .find((key) => location.pathname.startsWith(key))
 
@@ -109,42 +150,20 @@ export function AppShell() {
     routeMeta[0]
 
   const routeTitle = t(`shell.route.${currentRoute.key}.title`)
-  const routeBreadcrumbs = t(`shell.route.${currentRoute.key}.breadcrumbs`, {
-    returnObjects: true,
-  }) as string[]
-
-  const visibleBreadcrumbs = isCompactHeader
-    ? routeBreadcrumbs.slice(-1)
-    : !screens.lg
-      ? routeBreadcrumbs.slice(-2)
-      : routeBreadcrumbs
-
-  const breadcrumbItems = visibleBreadcrumbs.map((item) => ({
-    title: (
-      <span className={`mobile-clamp-1 text-slate-500 ${isCompactHeader ? 'max-w-[140px]' : 'max-w-[220px]'}`}>
-        {item}
-      </span>
-    ),
-  }))
+  const routeDescription = t(`shell.route.${currentRoute.key}.description`)
 
   const renderSidebarContent = () => (
     <div className="mobile-safe-bottom flex h-full flex-col px-3 py-4 text-slate-50 sm:px-4 sm:py-5">
       <div className="mb-4 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(15,118,110,0.18))] p-3.5 backdrop-blur sm:mb-5 sm:rounded-[24px] sm:p-4">
-        {/* Logo and App Name and Company Name */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex items-center justify-center bg-white rounded-[5px]">
-            <img src={logo} alt="PLT Solutions" className="h-12 w-14" />
+        <div className="flex items-center gap-2">
+          <div className="flex h-12 w-14 items-center justify-center rounded-[5px] bg-white">
+            <img src={logo} alt={t('common.logoAlt')} className="h-12 w-14" />
           </div>
-          <div className="flex flex-col">
-            <div className="font-semibold text-white text-2xl">
-              {t('common.appName')}
-            </div>
-            PLT Solutions
+          <div className="flex min-w-0 flex-col">
+            <div className="text-2xl font-semibold text-white">{t('common.appName')}</div>
+            <span className="text-sm text-slate-300">{t('common.companyName')}</span>
           </div>
         </div>
-        <Typography.Paragraph className="!mb-0 !text-sm !text-slate-300">
-          {t('shell.sidebarDescription')}
-        </Typography.Paragraph>
       </div>
 
       <Menu
@@ -159,24 +178,19 @@ export function AppShell() {
         className="flex-1 border-0 bg-transparent"
       />
 
-      <div className="mt-6 rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
-        <div className="mb-4 flex items-start gap-3">
+      <div className="mt-6 space-y-3 rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
+        {isMobile ? <LanguageSwitcher /> : null}
+
+        <div className="flex items-start gap-3">
           <Avatar size={42} className="bg-teal-500">
             {currentUser?.email?.slice(0, 1)?.toUpperCase()}
           </Avatar>
 
           <div className="min-w-0 flex-1">
             <p className="mb-1 truncate text-sm font-semibold text-white">{currentUser?.email}</p>
-            <div className="flex flex-wrap gap-2">
-              <Tag color="cyan" className="m-0 rounded-full">
-                {t(`common.roles.${profile?.role ?? 'unknown'}`)}
-              </Tag>
-              <Tag color={currentUser?.emailVerified ? 'green' : 'gold'} className="m-0 rounded-full">
-                {currentUser?.emailVerified
-                  ? t('common.states.verified')
-                  : t('common.states.pendingVerification')}
-              </Tag>
-            </div>
+            <Tag color="cyan" className="m-0 rounded-full">
+              {t(`common.roles.${profile?.role ?? 'unknown'}`)}
+            </Tag>
           </div>
         </div>
 
@@ -221,29 +235,16 @@ export function AppShell() {
               />
             ) : null}
 
-            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+            <div className="min-w-0 space-y-0.5">
+              <Typography.Title
+                level={isCompactHeader ? 4 : 3}
+                className={`!mb-0 !truncate !text-slate-900 ${isMobile ? '!text-lg sm:!text-xl' : '!text-xl sm:!text-2xl lg:!text-3xl'}`}
+              >
+                {routeTitle}
+              </Typography.Title>
               {!isMobile ? (
-                <>
-                  <Breadcrumb items={breadcrumbItems} className="min-w-0" />
-                  <div>
-                    <Typography.Title
-                      level={isCompactHeader ? 4 : 3}
-                      className="!mb-0 !truncate !text-slate-900 !text-xl sm:!text-2xl lg:!text-3xl"
-                    >
-                      {routeTitle}
-                    </Typography.Title>
-                  </div>
-                </>
-              )
-                : (
-                  <Typography.Title
-                    level={3}
-                    className="!mb-0 !truncate !text-slate-900 !text-lg sm:!text-xl"
-                  >
-                    {routeTitle}
-                  </Typography.Title>
-                )
-              }
+                <p className="mb-0 truncate text-sm text-slate-500">{routeDescription}</p>
+              ) : null}
             </div>
           </div>
 
@@ -269,45 +270,6 @@ export function AppShell() {
 
         <Content className="mobile-page-padding mobile-safe-bottom min-h-0 flex-1 overflow-y-auto px-0 pb-6 pt-3 sm:pt-4 lg:px-8 lg:pb-8">
           <div className="mx-auto w-full max-w-[1440px] space-y-4 sm:space-y-6">
-            {/* {!screens.lg ? (
-              <div className="sticky top-0 z-10 -mx-0.5 lg:hidden">
-                <div className="mobile-action-group rounded-[18px] border border-slate-200/80 bg-white/88 p-2 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] backdrop-blur">
-                  <Button
-                    type={location.pathname.startsWith('/bookings') && location.pathname !== '/bookings/new' ? 'primary' : 'default'}
-                    icon={<CalendarOutlined />}
-                    onClick={() => navigate('/bookings')}
-                  >
-                    {t('shell.menu.bookings')}
-                  </Button>
-                  <Button
-                    type={location.pathname.startsWith('/cars') ? 'primary' : 'default'}
-                    icon={<CarOutlined />}
-                    onClick={() => navigate('/cars')}
-                  >
-                    {t('shell.menu.cars')}
-                  </Button>
-                  <Button
-                    type={location.pathname === '/bookings/new' ? 'primary' : 'default'}
-                    icon={<PlusOutlined />}
-                    onClick={() => navigate('/bookings/new')}
-                  >
-                    {t('bookings.page.create')}
-                  </Button>
-                </div>
-              </div>
-            ) : null} */}
-
-            {/* {!currentUser?.emailVerified ? (
-              <Alert
-                className="rounded-2xl border border-amber-200 bg-amber-50"
-                type="warning"
-                showIcon
-                closable
-                title={t('shell.verification.title')}
-                description={t('shell.verification.description')}
-              />
-            ) : null} */}
-
             <Outlet />
           </div>
         </Content>

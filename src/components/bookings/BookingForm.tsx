@@ -15,8 +15,23 @@ import { useTranslation } from 'react-i18next'
 import { useBookings } from '../../hooks/useBookings'
 import { useCars } from '../../hooks/useCars'
 import { useCustomers } from '../../hooks/useCustomers'
-import { getBookingAdjustmentItems, getBookingExtraChargeItems } from '../../services/bookingService'
-import { formatCurrencyVnd, formatVndInput, parseVndInput } from '../../utils/currency'
+import {
+  getBookingAdjustmentItems,
+  getBookingExtraChargeItems,
+  getBookingFinanceGuardMessage,
+} from '../../services/bookingService'
+import { formatCurrencyVnd, MAX_MONEY_AMOUNT } from '../../utils/currency'
+import {
+  duplicatePhoneRule,
+  emailRule,
+  formScrollToFirstError,
+  formValidateTrigger,
+  nonNegativeMoneyRule,
+  positiveMoneyRule,
+  rentalAmountRule,
+  requiredTrimmed,
+  vnPhoneRule,
+} from '../../utils/validation'
 import {
   Booking,
   BookingAdjustmentItem,
@@ -29,6 +44,8 @@ import {
   PaymentStatus,
 } from '../../types/Booking'
 import { SectionCard } from '../ui/SectionCard'
+import { MoneyText } from '../ui/MoneyText'
+import { VndInputNumber } from '../ui/VndInputNumber'
 import { BookingDocumentUpload } from './BookingDocumentUpload'
 import { BookingTransactionList } from './BookingTransactionList'
 
@@ -239,12 +256,22 @@ export function BookingForm({
 }: BookingFormProps) {
   const [form] = Form.useForm<BookingFormValues>()
   const { t, i18n } = useTranslation()
+  const moneyMaxMessage = t('common.validation.moneyMax', {
+    max: formatCurrencyVnd(MAX_MONEY_AMOUNT, i18n.resolvedLanguage),
+  })
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
   const { modal } = App.useApp()
   const { bookings: activeBookings } = useBookings({ statuses: blockingBookingStatuses })
   const { cars, loading: carsLoading } = useCars()
-  const { customers, loading: customersLoading } = useCustomers()
+  const { customers: customerDirectory, loading: customersLoading } = useCustomers({ includeInactive: true })
+  const customers = useMemo(
+    () =>
+      customerDirectory.filter(
+        (customer) => customer.isActive !== false || customer.id === initialValues?.customerId
+      ),
+    [customerDirectory, initialValues?.customerId]
+  )
   const selectedCustomerId = Form.useWatch('customerId', form)
   const selectedCarId = Form.useWatch('carId', form)
   const selectedStartDate = Form.useWatch('startDate', form) as Dayjs | undefined
@@ -590,6 +617,18 @@ export function BookingForm({
 
     if (car?.status === 'repair') {
       form.setFields([{ name: 'carId', errors: [t('bookings.form.validation.carRepairBlocked')] }])
+      form.scrollToField('carId', formScrollToFirstError)
+      return
+    }
+
+    const financeGuardMessage = getBookingFinanceGuardMessage(values.status, values)
+
+    if (financeGuardMessage) {
+      const fieldName =
+        financeGuardMessage === 'bookings.messages.depositRequired' ? 'depositAmount' : 'paymentAmountThisTime'
+
+      form.setFields([{ name: fieldName, errors: [t(financeGuardMessage)] }])
+      form.scrollToField(fieldName, formScrollToFirstError)
       return
     }
 
@@ -650,6 +689,8 @@ export function BookingForm({
         onFinish={handleFinish}
         disabled={isLoading || isReadOnlyBooking}
         className={isMobile ? 'mobile-safe-bottom' : undefined}
+        validateTrigger={[...formValidateTrigger]}
+        scrollToFirstError={formScrollToFirstError}
         initialValues={{
           status: 'draft',
           paymentStatus: 'unpaid',
@@ -731,7 +772,7 @@ export function BookingForm({
                 {t('bookings.finance.total')}
               </Typography.Text>
               <div className="mt-1 text-base font-semibold text-slate-900">
-                {formatCurrencyVnd(calculatedTotal, i18n.resolvedLanguage)}
+                <MoneyText value={calculatedTotal} language={i18n.resolvedLanguage} />
               </div>
             </div>
 
@@ -740,7 +781,7 @@ export function BookingForm({
                 {t('bookings.finance.remaining')}
               </Typography.Text>
               <div className="mt-1 text-base font-semibold text-amber-800">
-                {formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage)}
+                <MoneyText value={remainingAmount} language={i18n.resolvedLanguage} />
               </div>
             </div>
           </div>
@@ -796,6 +837,14 @@ export function BookingForm({
         </Typography.Paragraph>
       ) : null}
 
+      <SectionCard
+        className="mb-6"
+        title={t('bookings.form.identityTitle')}
+        description={t('bookings.form.identityDescription')}
+      >
+        {renderMobileSectionIntro(t('bookings.form.identityTitle'), t('bookings.form.identityDescription'))}
+
+        <div className={isMobile ? 'space-y-3 p-3.5' : 'space-y-4 p-4 sm:p-5'}>
       <div className="grid gap-4 md:grid-cols-2">
         <Form.Item
           name="carId"
@@ -856,7 +905,7 @@ export function BookingForm({
         <Form.Item
           name="customerName"
           label={t('bookings.form.customerName')}
-          rules={[{ required: true, message: t('bookings.form.validation.customerName') }]}
+          rules={[requiredTrimmed(t('bookings.form.validation.customerName'))]}
         >
           <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerNamePlaceholder')} />
         </Form.Item>
@@ -864,20 +913,50 @@ export function BookingForm({
         <Form.Item
           name="customerPhoneNumber"
           label={t('bookings.form.customerPhoneNumber')}
-          rules={[{ required: true, message: t('bookings.form.validation.customerPhoneNumber') }]}
+          dependencies={['customerId']}
+          validateFirst
+          rules={[
+            vnPhoneRule({
+              requiredMessage: t('bookings.form.validation.customerPhoneNumber'),
+              formatMessage: t('common.validation.phoneFormat'),
+            }),
+            duplicatePhoneRule(t('bookings.form.validation.duplicatePhone'), () => customerDirectory, {
+              getCurrentId: () => form.getFieldValue('customerId'),
+            }),
+          ]}
         >
-          <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerPhoneNumberPlaceholder')} />
+          <Input
+            disabled={isIdentityLocked}
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder={t('bookings.form.customerPhoneNumberPlaceholder')}
+          />
         </Form.Item>
 
         <Form.Item
           name="customerEmail"
           label={t('bookings.form.customerEmail')}
-          rules={[{ type: 'email', message: t('bookings.form.validation.customerEmail') }]}
+          rules={[emailRule(t('common.validation.emailFormat'))]}
         >
-          <Input disabled={isIdentityLocked} placeholder={t('bookings.form.customerEmailPlaceholder')} />
+          <Input
+            disabled={isIdentityLocked}
+            inputMode="email"
+            autoComplete="email"
+            placeholder={t('bookings.form.customerEmailPlaceholder')}
+          />
         </Form.Item>
       </div>
+        </div>
+      </SectionCard>
 
+      <SectionCard
+        className="mb-6"
+        title={t('bookings.form.scheduleSectionTitle')}
+        description={t('bookings.form.scheduleSectionDescription')}
+      >
+        {renderMobileSectionIntro(t('bookings.form.scheduleSectionTitle'), t('bookings.form.scheduleSectionDescription'))}
+
+        <div className={isMobile ? 'space-y-3 p-3.5' : 'space-y-4 p-4 sm:p-5'}>
       {isMobile ? (
         <div className="grid gap-4">
           <Form.Item
@@ -1035,12 +1114,22 @@ export function BookingForm({
           </Form.Item>
         </div>
       )}
+        </div>
+      </SectionCard>
 
+      <SectionCard
+        className="mb-6"
+        title={t('bookings.form.locationsTitle')}
+        description={t('bookings.form.locationsDescription')}
+      >
+        {renderMobileSectionIntro(t('bookings.form.locationsTitle'), t('bookings.form.locationsDescription'))}
+
+        <div className={isMobile ? 'space-y-3 p-3.5' : 'space-y-4 p-4 sm:p-5'}>
       <div className="grid gap-4 md:grid-cols-2">
         <Form.Item
           name="pickupLocation"
           label={t('bookings.form.pickupLocation')}
-          rules={[{ required: true, message: t('bookings.form.validation.pickupLocation') }]}
+          rules={[requiredTrimmed(t('bookings.form.validation.pickupLocation'))]}
         >
           <Input placeholder={t('bookings.form.pickupLocationPlaceholder')} />
         </Form.Item>
@@ -1048,15 +1137,26 @@ export function BookingForm({
         <Form.Item
           name="returnLocation"
           label={t('bookings.form.returnLocation')}
-          rules={[{ required: true, message: t('bookings.form.validation.returnLocation') }]}
+          rules={[requiredTrimmed(t('bookings.form.validation.returnLocation'))]}
         >
           <Input placeholder={t('bookings.form.returnLocationPlaceholder')} />
         </Form.Item>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Form.Item name="status" label={t('bookings.form.status')} rules={[{ required: true }]}>
-          <Select options={bookingStatuses.map((status) => ({ value: status, label: t(`bookings.status.${status}`) }))} />
+        <Form.Item
+          name="status"
+          label={t('bookings.form.status')}
+          help={t(`bookings.statusHint.${currentBookingStatus}`)}
+          rules={[{ required: true }]}
+        >
+          <Select
+            options={bookingStatuses.map((status) => ({
+              value: status,
+              label: t(`bookings.status.${status}`),
+              title: t(`bookings.statusHint.${status}`),
+            }))}
+          />
         </Form.Item>
 
         {requiresCarReturnStatus ? (
@@ -1076,6 +1176,8 @@ export function BookingForm({
           </Form.Item>
         ) : null}
       </div>
+        </div>
+      </SectionCard>
 
       {/* <div className="grid gap-4 md:grid-cols-3">
         <Form.Item label={t('bookings.form.paymentStatus')}>
@@ -1101,8 +1203,8 @@ export function BookingForm({
             </Typography.Paragraph>
           </div>
 
-          <Tag color="blue" className="!mr-0 rounded-full px-3 py-1 font-medium">
-            {formatCurrencyVnd(fixedTotal, i18n.resolvedLanguage)}
+          <Tag color="blue" className="money-tag !mr-0 rounded-full px-3 py-1 font-medium">
+            <MoneyText value={fixedTotal} language={i18n.resolvedLanguage} />
           </Tag>
         </div>
 
@@ -1110,42 +1212,35 @@ export function BookingForm({
           <Form.Item
             name="rentalAmount"
             label={t('bookings.form.rentalAmount')}
-            rules={[{ required: true, message: t('bookings.form.validation.rentalAmount') }]}
+            dependencies={['status']}
+            rules={[
+              rentalAmountRule({
+                nonNegativeMessage: t('common.validation.moneyNonNegative'),
+                positiveWhenActiveMessage: t('bookings.form.validation.rentalAmountPositive'),
+                maxMessage: moneyMaxMessage,
+              }),
+            ]}
             className="!mb-0"
           >
-            <InputNumber
-              min={0}
-              precision={0}
-              step={100000}
-              controls={false}
-              className="w-full"
-              formatter={formatVndInput}
-              parser={parseVndInput}
-            />
+            <VndInputNumber />
           </Form.Item>
 
-          <Form.Item name="depositAmount" label={t('bookings.form.depositAmount')} className="!mb-0">
-            <InputNumber
-              min={0}
-              precision={0}
-              step={100000}
-              controls={false}
-              className="w-full"
-              formatter={formatVndInput}
-              parser={parseVndInput}
-            />
+          <Form.Item
+            name="depositAmount"
+            label={t('bookings.form.depositAmount')}
+            rules={[nonNegativeMoneyRule(t('common.validation.moneyNonNegative'), moneyMaxMessage)]}
+            className="!mb-0"
+          >
+            <VndInputNumber />
           </Form.Item>
 
-          <Form.Item name="securityDeposit" label={t('bookings.form.securityDeposit')} className="!mb-0">
-            <InputNumber
-              min={0}
-              precision={0}
-              step={100000}
-              controls={false}
-              className="w-full"
-              formatter={formatVndInput}
-              parser={parseVndInput}
-            />
+          <Form.Item
+            name="securityDeposit"
+            label={t('bookings.form.securityDeposit')}
+            rules={[nonNegativeMoneyRule(t('common.validation.moneyNonNegative'), moneyMaxMessage)]}
+            className="!mb-0"
+          >
+            <VndInputNumber />
           </Form.Item>
         </div>
       </div>
@@ -1161,8 +1256,8 @@ export function BookingForm({
             </Typography.Paragraph>
           </div>
 
-          <Tag color="processing" className="!mr-0 rounded-full px-3 py-1 font-medium">
-            {formatCurrencyVnd(extraCharges, i18n.resolvedLanguage)}
+          <Tag color="processing" className="money-tag !mr-0 rounded-full px-3 py-1 font-medium">
+            <MoneyText value={extraCharges} language={i18n.resolvedLanguage} />
           </Tag>
         </div>
 
@@ -1176,13 +1271,18 @@ export function BookingForm({
               {fields.map((field) => (
                 <div
                   key={field.key}
-                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
+                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[minmax(0,160px)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                 >
                   <Form.Item name={[field.name, 'id']} hidden>
                     <Input />
                   </Form.Item>
 
-                  <Form.Item name={[field.name, 'type']} label={t('bookings.form.chargeType')} className="!mb-0">
+                  <Form.Item
+                    name={[field.name, 'type']}
+                    label={t('bookings.form.chargeType')}
+                    rules={[{ required: true, message: t('common.validation.lineItemType') }]}
+                    className="!mb-0"
+                  >
                     <Select
                       placeholder={t('bookings.form.chargeTypePlaceholder')}
                       options={chargeTypes.map((type) => ({
@@ -1196,16 +1296,13 @@ export function BookingForm({
                     <Input placeholder={t('bookings.form.lineItemLabelPlaceholder')} />
                   </Form.Item>
 
-                  <Form.Item name={[field.name, 'amount']} label={t('bookings.form.lineItemAmount')} className="!mb-0">
-                    <InputNumber
-                      min={0}
-                      precision={0}
-                      step={100000}
-                      controls={false}
-                      className="w-full"
-                      formatter={formatVndInput}
-                      parser={parseVndInput}
-                    />
+                  <Form.Item
+                    name={[field.name, 'amount']}
+                    label={t('bookings.form.lineItemAmount')}
+                    rules={[positiveMoneyRule(t('common.validation.lineItemAmount'), moneyMaxMessage)]}
+                    className="!mb-0"
+                  >
+                    <VndInputNumber />
                   </Form.Item>
 
                   <Form.Item name={[field.name, 'note']} label={t('bookings.form.lineItemNote')} className="!mb-0">
@@ -1247,8 +1344,8 @@ export function BookingForm({
             </Typography.Paragraph>
           </div>
 
-          <Tag color="purple" className="!mr-0 rounded-full px-3 py-1 font-medium">
-            {formatCurrencyVnd(adjustmentTotal, i18n.resolvedLanguage)}
+          <Tag color="purple" className="money-tag !mr-0 rounded-full px-3 py-1 font-medium">
+            <MoneyText value={adjustmentTotal} language={i18n.resolvedLanguage} />
           </Tag>
         </div>
 
@@ -1262,13 +1359,18 @@ export function BookingForm({
               {fields.map((field) => (
                 <div
                   key={field.key}
-                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[160px_minmax(0,1.2fr)_140px_minmax(0,1fr)_auto]"
+                  className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 md:grid-cols-[minmax(0,160px)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                 >
                   <Form.Item name={[field.name, 'id']} hidden>
                     <Input />
                   </Form.Item>
 
-                  <Form.Item name={[field.name, 'type']} label={t('bookings.form.adjustmentType')} className="!mb-0">
+                  <Form.Item
+                    name={[field.name, 'type']}
+                    label={t('bookings.form.adjustmentType')}
+                    rules={[{ required: true, message: t('common.validation.lineItemType') }]}
+                    className="!mb-0"
+                  >
                     <Select
                       placeholder={t('bookings.form.adjustmentTypePlaceholder')}
                       options={adjustmentTypes.map((type) => ({
@@ -1282,16 +1384,13 @@ export function BookingForm({
                     <Input placeholder={t('bookings.form.lineItemLabelPlaceholder')} />
                   </Form.Item>
 
-                  <Form.Item name={[field.name, 'amount']} label={t('bookings.form.lineItemAmount')} className="!mb-0">
-                    <InputNumber
-                      min={0}
-                      precision={0}
-                      step={100000}
-                      controls={false}
-                      className="w-full"
-                      formatter={formatVndInput}
-                      parser={parseVndInput}
-                    />
+                  <Form.Item
+                    name={[field.name, 'amount']}
+                    label={t('bookings.form.lineItemAmount')}
+                    rules={[positiveMoneyRule(t('common.validation.lineItemAmount'), moneyMaxMessage)]}
+                    className="!mb-0"
+                  >
+                    <VndInputNumber />
                   </Form.Item>
 
                   <Form.Item name={[field.name, 'note']} label={t('bookings.form.lineItemNote')} className="!mb-0">
@@ -1359,7 +1458,7 @@ export function BookingForm({
                 {t('bookings.form.paidAmount')}
               </Typography.Text>
               <div className="mt-1 text-lg font-semibold text-emerald-700">
-                {formatCurrencyVnd(cumulativePaidAmount, i18n.resolvedLanguage)}
+                <MoneyText value={cumulativePaidAmount} language={i18n.resolvedLanguage} />
               </div>
               <Typography.Text className="text-xs text-slate-500">
                 {t('bookings.form.cumulativePaidAmountHelp')}
@@ -1371,7 +1470,7 @@ export function BookingForm({
                 {t('bookings.finance.remaining')}
               </Typography.Text>
               <div className="mt-1 text-lg font-semibold text-amber-700">
-                {formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage)}
+                <MoneyText value={remainingAmount} language={i18n.resolvedLanguage} />
               </div>
               <Typography.Text className="text-xs text-slate-500">
                 {t('bookings.form.remainingAmountHelp')}
@@ -1383,7 +1482,7 @@ export function BookingForm({
                 {t('bookings.finance.depositGap')}
               </Typography.Text>
               <div className="mt-1 text-lg font-semibold text-slate-900">
-                {formatCurrencyVnd(depositGap, i18n.resolvedLanguage)}
+                <MoneyText value={depositGap} language={i18n.resolvedLanguage} />
               </div>
               <Typography.Text className="text-xs text-slate-500">
                 {t('bookings.form.depositGapHelp')}
@@ -1396,18 +1495,10 @@ export function BookingForm({
               name="paymentAmountThisTime"
               label={t('bookings.form.paymentAmountThisTime')}
               extra={t('bookings.form.paymentAmountThisTimeHelp')}
+              rules={[nonNegativeMoneyRule(t('common.validation.moneyNonNegative'), moneyMaxMessage)]}
               className="!mb-0"
             >
-              <InputNumber
-                min={0}
-                precision={0}
-                step={100000}
-                controls={false}
-                className="w-full"
-                placeholder={t('bookings.form.paymentAmountThisTimePlaceholder')}
-                formatter={formatVndInput}
-                parser={parseVndInput}
-              />
+              <VndInputNumber placeholder={t('bookings.form.paymentAmountThisTimePlaceholder')} />
             </Form.Item>
 
             <Form.Item name="paymentMethod" label={t('bookings.form.paymentMethod')} className="!mb-0">
@@ -1427,7 +1518,7 @@ export function BookingForm({
               <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
                 {t('bookings.form.paymentPreviewTitle')}
               </Typography.Text>
-              <Typography.Paragraph className="!mb-0 mt-2 text-sm text-slate-600">
+              <Typography.Paragraph className="money-amount !mb-0 mt-2 text-sm text-slate-600">
                 {t('bookings.form.paymentPreviewDescription', {
                   paid: formatCurrencyVnd(cumulativePaidAmount, i18n.resolvedLanguage),
                   remaining: formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage),
@@ -1486,11 +1577,13 @@ export function BookingForm({
           <div className="rounded-2xl border border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)] backdrop-blur">
             <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between gap-4'}>
               <div className="min-w-0">
-                <Typography.Text strong className="block text-sm text-slate-900">
-                  {t('bookings.finance.total')}: {formatCurrencyVnd(calculatedTotal, i18n.resolvedLanguage)}
+                <Typography.Text strong className="block min-w-0 text-sm text-slate-900">
+                  {t('bookings.finance.total')}:{' '}
+                  <MoneyText value={calculatedTotal} language={i18n.resolvedLanguage} />
                 </Typography.Text>
-                <Typography.Text className="block text-xs text-slate-500">
-                  {t('bookings.finance.remaining')}: {formatCurrencyVnd(remainingAmount, i18n.resolvedLanguage)}
+                <Typography.Text className="block min-w-0 text-xs text-slate-500">
+                  {t('bookings.finance.remaining')}:{' '}
+                  <MoneyText value={remainingAmount} language={i18n.resolvedLanguage} />
                 </Typography.Text>
               </div>
 

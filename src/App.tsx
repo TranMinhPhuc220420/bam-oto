@@ -24,6 +24,9 @@ import { FinancePage } from './pages/FinancePage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { CustomerDetailPage } from './pages/customers/CustomerDetailPage'
+import { CustomersPage } from './pages/customers/CustomersPage'
+import { NewCustomerPage } from './pages/customers/NewCustomerPage'
 import { NewUserPage } from './pages/users/NewUserPage'
 import { UsersPage } from './pages/users/UsersPage'
 
@@ -55,13 +58,16 @@ function AppRoutes() {
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/cars" element={<CarsPage />} />
-          <Route path="/cars/new" element={<NewCarPage />} />
-          <Route path="/cars/edit/:id" element={<EditCarPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/bookings/new" element={<NewBookingPage />} />
           <Route path="/bookings/edit/:id" element={<EditBookingPage />} />
           <Route path="/bookings/:id" element={<BookingDetailPage />} />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/customers/new" element={<NewCustomerPage />} />
+          <Route path="/customers/:id" element={<CustomerDetailPage />} />
           <Route element={<ProtectedRoute requireAdmin />}>
+            <Route path="/cars/new" element={<NewCarPage />} />
+            <Route path="/cars/edit/:id" element={<EditCarPage />} />
             <Route path="/cars/catalog" element={<CarCatalogPage />} />
             <Route path="/cars/brands" element={<Navigate to="/cars/catalog" replace />} />
             <Route path="/cars/models" element={<Navigate to="/cars/catalog" replace />} />

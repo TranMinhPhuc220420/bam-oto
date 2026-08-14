@@ -156,6 +156,41 @@ a {
 
 .data-table .ant-table-tbody > tr > td {
   border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.money-amount {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
+}
+
+.ant-input-number {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ant-input-number-input-wrap,
+.ant-input-number-input {
+  min-width: 0;
+}
+
+.ant-input-number-input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ant-tag.money-tag {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .data-table .ant-table-tbody > tr:hover > td {

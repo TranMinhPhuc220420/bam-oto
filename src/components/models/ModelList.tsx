@@ -1,24 +1,77 @@
-import { EditOutlined } from '@ant-design/icons'
-import { Button, Empty, Grid, Skeleton, Space, Table, Tag, Typography } from 'antd'
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Empty, Grid, Popconfirm, Skeleton, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 
+import type { CatalogDeleteEligibilityResult } from '../../services/carCatalog'
 import { CarModel } from '../../types/Model'
+import { EmptyCopy } from '../ui/EmptyCopy'
 
 interface ModelListProps {
   models: CarModel[]
   brandNames: Record<string, string>
   loading: boolean
   onEdit: (model: CarModel) => void
+  onDelete?: (model: CarModel) => void
+  deletingId?: string | null
+  getDeleteState?: (model: CarModel) => CatalogDeleteEligibilityResult
 }
 
 const { Text } = Typography
 
-export function ModelList({ models, brandNames, loading, onEdit }: ModelListProps) {
+export function ModelList({
+  models,
+  brandNames,
+  loading,
+  onEdit,
+  onDelete,
+  deletingId,
+  getDeleteState,
+}: ModelListProps) {
   const { t } = useTranslation()
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
   const showBrandLabel = new Set(models.map((model) => brandNames[model.brandId] ?? model.brandId)).size > 1
+
+  const renderDeleteControl = (model: CarModel) => {
+    if (!onDelete) {
+      return null
+    }
+
+    const deleteState = getDeleteState?.(model) ?? { allowed: true }
+    const button = (
+      <Button
+        icon={<DeleteOutlined />}
+        size="small"
+        danger
+        shape="circle"
+        disabled={!deleteState.allowed}
+        loading={Boolean(model.id && deletingId === model.id)}
+        aria-label={t('common.actions.delete')}
+      />
+    )
+
+    if (!deleteState.allowed) {
+      return (
+        <Tooltip title={t(deleteState.reasonKey ?? 'models.messages.deleteError')}>
+          <span>{button}</span>
+        </Tooltip>
+      )
+    }
+
+    return (
+      <Popconfirm
+        title={t('models.messages.deleteTitle')}
+        description={t('models.messages.deleteDescription', { name: model.name })}
+        onConfirm={() => onDelete(model)}
+        okText={t('common.actions.delete')}
+        cancelText={t('common.actions.cancel')}
+        okButtonProps={{ danger: true }}
+      >
+        {button}
+      </Popconfirm>
+    )
+  }
 
   const columns: ColumnsType<CarModel> = [
     {
@@ -54,10 +107,17 @@ export function ModelList({ models, brandNames, loading, onEdit }: ModelListProp
       key: 'action',
       align: 'right',
       render: (_, record) => (
-        <Space>
-          <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
-            {t('common.actions.edit')}
-          </Button>
+        <Space size="small">
+          <Tooltip title={t('common.actions.edit')}>
+            <Button
+              icon={<EditOutlined />}
+              size="small"
+              shape="circle"
+              aria-label={t('common.actions.edit')}
+              onClick={() => onEdit(record)}
+            />
+          </Tooltip>
+          {renderDeleteControl(record)}
         </Space>
       ),
     },
@@ -82,7 +142,7 @@ export function ModelList({ models, brandNames, loading, onEdit }: ModelListProp
     if (!models.length) {
       return (
         <div className="rounded-[16px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('models.list.empty')} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<EmptyCopy title={t('models.list.empty')} hint={t('models.list.emptyHint')} />} />
         </div>
       )
     }
@@ -116,6 +176,7 @@ export function ModelList({ models, brandNames, loading, onEdit }: ModelListProp
                   aria-label={t('common.actions.edit')}
                   onClick={() => onEdit(model)}
                 />
+                {renderDeleteControl(model)}
               </div>
             </article>
           )
@@ -137,7 +198,7 @@ export function ModelList({ models, brandNames, loading, onEdit }: ModelListProp
         emptyText: (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={t('models.list.empty')}
+            description={<EmptyCopy title={t('models.list.empty')} hint={t('models.list.emptyHint')} />}
           />
         ),
       }}

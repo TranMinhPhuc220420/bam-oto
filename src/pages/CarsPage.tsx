@@ -8,13 +8,15 @@ import {
 import { App, Button, Grid } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { collection, deleteDoc, doc, onSnapshot, query } from 'firebase/firestore'
+import { collection, onSnapshot, query } from 'firebase/firestore'
 
 import { CarList } from '../components/cars/CarList'
 import { MetricCard } from '../components/ui/MetricCard'
 import { SectionCard } from '../components/ui/SectionCard'
+import { useAuth } from '../hooks/useAuth'
 import { useBookings } from '../hooks/useBookings'
 import { db } from '../services/firebase'
+import { deleteCarWithGuards } from '../services/carService'
 import { Car } from '../types/Car'
 
 export function CarsPage() {
@@ -24,6 +26,8 @@ export function CarsPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { message } = App.useApp()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const { bookings: activeBookings, loading: activeBookingsLoading } = useBookings({ statuses: ['in-progress'] })
 
   useEffect(() => {
@@ -75,12 +79,26 @@ export function CarsPage() {
   )
 
   const handleEdit = (car: Car) => {
+    if (!isAdmin) {
+      return
+    }
+
     navigate(`/cars/edit/${car.id}`)
   }
 
-  const handleDelete = async (carId: string) => {
+  const handleDelete = async (car: Car) => {
+    if (!car.id) {
+      return
+    }
+
     try {
-      await deleteDoc(doc(db, 'cars', carId))
+      const result = await deleteCarWithGuards(car, profile?.role ?? null)
+
+      if (!result.allowed) {
+        message.warning(t(result.reasonKey ?? 'cars.messages.deleteError'))
+        return
+      }
+
       message.success(t('cars.messages.deleteSuccess'))
     } catch (error) {
       console.error('Error deleting car:', error)
@@ -139,21 +157,24 @@ export function CarsPage() {
         title={t('cars.page.inventoryTitle')}
         description={t('cars.page.inventoryDescription')}
         actions={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/cars/new')}
-            size="small"
-            className="rounded-full px-6 sm:self-start"
-          >
-            {t('cars.create.title')}
-          </Button>
+          isAdmin ? (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/cars/new')}
+              size="small"
+              className="rounded-full px-6 sm:self-start"
+            >
+              {t('cars.create.title')}
+            </Button>
+          ) : undefined
         }
       >
         <CarList
           cars={cars}
           isLoading={loading || activeBookingsLoading}
           activeBookingByCarId={activeBookingByCarId}
+          canManage={isAdmin}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

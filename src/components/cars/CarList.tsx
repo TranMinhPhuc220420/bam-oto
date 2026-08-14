@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { Car, CarStatus } from '../../types/Car'
+import { EmptyCopy } from '../ui/EmptyCopy'
 
 interface ActiveBookingSummary {
   id: string
@@ -15,8 +16,9 @@ interface CarListProps {
   cars: Car[]
   isLoading: boolean
   activeBookingByCarId?: Record<string, ActiveBookingSummary>
-  onEdit: (car: Car) => void
-  onDelete: (carId: string) => void
+  canManage?: boolean
+  onEdit?: (car: Car) => void
+  onDelete?: (car: Car) => void
 }
 
 const { Text } = Typography
@@ -28,7 +30,14 @@ const statusColors: Record<CarStatus, string> = {
   repair: 'red',
 }
 
-export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, onDelete }: CarListProps) {
+export function CarList({
+  cars,
+  isLoading,
+  activeBookingByCarId = {},
+  canManage = false,
+  onEdit,
+  onDelete,
+}: CarListProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const screens = Grid.useBreakpoint()
@@ -90,13 +99,17 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
       sorter: (a, b) => a.plateNumber.localeCompare(b.plateNumber),
       render: (_, record) => (
         <div className="space-y-1">
-          <button
-            type="button"
-            className="cursor-pointer bg-transparent p-0 text-left text-sm font-semibold text-slate-900 transition hover:text-teal-700"
-            onClick={() => onEdit(record)}
-          >
-            {record.plateNumber}
-          </button>
+          {canManage && onEdit ? (
+            <button
+              type="button"
+              className="cursor-pointer bg-transparent p-0 text-left text-sm font-semibold text-slate-900 transition hover:text-teal-700"
+              onClick={() => onEdit(record)}
+            >
+              {record.plateNumber}
+            </button>
+          ) : (
+            <div className="text-sm font-semibold text-slate-900">{record.plateNumber}</div>
+          )}
           <div className="text-sm text-slate-500">
             {[record.brand, record.model].filter(Boolean).join(' • ') || t('cars.list.missingBrandModel')}
           </div>
@@ -141,6 +154,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
       title: t('cars.list.actions'),
       key: 'action',
       align: 'right',
+      hidden: !canManage,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title={t('common.actions.edit')}>
@@ -149,13 +163,13 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
               size='small'
               shape="circle"
               aria-label={t('common.actions.edit')}
-              onClick={() => onEdit(record)}
+              onClick={() => onEdit?.(record)}
             />
           </Tooltip>
           <Popconfirm
             title={t('cars.list.deleteTitle')}
             description={t('cars.list.deleteDescription')}
-            onConfirm={() => onDelete(record.id as string)}
+            onConfirm={() => onDelete?.(record)}
             okText={t('common.actions.delete')}
             cancelText={t('common.actions.cancel')}
           >
@@ -185,7 +199,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
     if (!cars.length) {
       return (
         <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('cars.list.empty')} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<EmptyCopy title={t('cars.list.empty')} hint={t('cars.list.emptyHint')} />} />
         </div>
       )
     }
@@ -216,13 +230,17 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        className="mobile-clamp-1 cursor-pointer bg-transparent text-left text-[15px] font-semibold text-slate-900 transition hover:text-teal-700"
-                        onClick={() => onEdit(record)}
-                      >
-                        {record.plateNumber}
-                      </button>
+                      {canManage && onEdit ? (
+                        <button
+                          type="button"
+                          className="mobile-clamp-1 cursor-pointer bg-transparent text-left text-[15px] font-semibold text-slate-900 transition hover:text-teal-700"
+                          onClick={() => onEdit(record)}
+                        >
+                          {record.plateNumber}
+                        </button>
+                      ) : (
+                        <div className="mobile-clamp-1 text-[15px] font-semibold text-slate-900">{record.plateNumber}</div>
+                      )}
                       <div className="mobile-clamp-1 mt-0.5 text-sm text-slate-600">{brandModelLabel}</div>
                     </div>
 
@@ -256,32 +274,34 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
                   <div className="mobile-clamp-1">{renderCurrentBookingContent(record, true)}</div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1">
-                  <Tooltip title={t('common.actions.edit')}>
-                    <Button
-                      icon={<EditOutlined />}
-                      shape="circle"
-                      size="small"
-                      aria-label={t('common.actions.edit')}
-                      onClick={() => onEdit(record)}
-                    />
-                  </Tooltip>
-                  <Popconfirm
-                    title={t('cars.list.deleteTitle')}
-                    description={t('cars.list.deleteDescription')}
-                    onConfirm={() => onDelete(record.id as string)}
-                    okText={t('common.actions.delete')}
-                    cancelText={t('common.actions.cancel')}
-                  >
-                    <Button
-                      icon={<DeleteOutlined />}
-                      danger
-                      shape="circle"
-                      size="small"
-                      aria-label={t('common.actions.delete')}
-                    />
-                  </Popconfirm>
-                </div>
+                {canManage ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Tooltip title={t('common.actions.edit')}>
+                      <Button
+                        icon={<EditOutlined />}
+                        shape="circle"
+                        size="small"
+                        aria-label={t('common.actions.edit')}
+                        onClick={() => onEdit?.(record)}
+                      />
+                    </Tooltip>
+                    <Popconfirm
+                      title={t('cars.list.deleteTitle')}
+                      description={t('cars.list.deleteDescription')}
+                      onConfirm={() => onDelete?.(record)}
+                      okText={t('common.actions.delete')}
+                      cancelText={t('common.actions.cancel')}
+                    >
+                      <Button
+                        icon={<DeleteOutlined />}
+                        danger
+                        shape="circle"
+                        size="small"
+                        aria-label={t('common.actions.delete')}
+                      />
+                    </Popconfirm>
+                  </div>
+                ) : null}
               </div>
             </article>
           )
@@ -293,7 +313,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
   return (
     <Table
       className="data-table"
-      columns={columns}
+      columns={columns.filter((column) => column.hidden !== true)}
       dataSource={cars}
       rowKey="id"
       loading={isLoading}
@@ -303,7 +323,7 @@ export function CarList({ cars, isLoading, activeBookingByCarId = {}, onEdit, on
         emptyText: (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={t('cars.list.empty')}
+            description={<EmptyCopy title={t('cars.list.empty')} hint={t('cars.list.emptyHint')} />}
           />
         ),
       }}
